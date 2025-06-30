@@ -9,7 +9,7 @@ local Mouse = LocalPlayer:GetMouse()
 
 -- Settings
 local settings = {
-    enabled = true,
+    enabled = false,
     triggerOn = true, -- Automatically turn on when script starts
     toggleKey = Enum.KeyCode.Home,
     triggerToggleKey = Enum.KeyCode.T,
