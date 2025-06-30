@@ -9,12 +9,12 @@ local Mouse = LocalPlayer:GetMouse()
 
 -- Settings
 local settings = {
-    enabled = false,
-    triggerOn = true,
+    enabled = true,
+    triggerOn = true, -- Automatically turn on when script starts
     toggleKey = Enum.KeyCode.Home,
     triggerToggleKey = Enum.KeyCode.T,
     shootDelay = 0, -- Default delay between shots in seconds
-    firstShotDelay = 0, -- Delay before first shot in seconds
+    firstShotDelay = 0.03, -- Changed to 0.03 as requested
     lastShotTime = 0,
     targetDetectedTime = 0,
     hasTarget = false
@@ -27,7 +27,7 @@ screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 240, 0, 180) -- Increased height for new elements
+mainFrame.Size = UDim2.new(0, 240, 0, 200) -- Increased height for new warning label
 mainFrame.Position = UDim2.new(0.5, -110, 0.5, -90)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -102,8 +102,8 @@ triggerStatusLabel.Name = "TriggerStatusLabel"
 triggerStatusLabel.Size = UDim2.new(1, -20, 0, 20)
 triggerStatusLabel.Position = UDim2.new(0, 10, 0, 65)
 triggerStatusLabel.BackgroundTransparency = 1
-triggerStatusLabel.Text = "Active: OFF (Press T)"
-triggerStatusLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+triggerStatusLabel.Text = "Active: ON (Press T)" -- Changed to ON by default
+triggerStatusLabel.TextColor3 = Color3.fromRGB(50, 255, 50) -- Green since it's on by default
 triggerStatusLabel.Font = Enum.Font.Gotham
 triggerStatusLabel.TextSize = 12
 triggerStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -123,7 +123,7 @@ firstDelayTitle.Name = "FirstDelayTitle"
 firstDelayTitle.Size = UDim2.new(1, 0, 0.5, 0)
 firstDelayTitle.Position = UDim2.new(0, 0, 0, 0)
 firstDelayTitle.BackgroundTransparency = 1
-firstDelayTitle.Text = "First Shot Delay: 0s"
+firstDelayTitle.Text = "First Shot Delay: 0.03s" -- Updated to show 0.03 by default
 firstDelayTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
 firstDelayTitle.Font = Enum.Font.Gotham
 firstDelayTitle.TextSize = 12
@@ -140,7 +140,7 @@ firstDelayBar.Parent = firstDelaySlider
 
 local firstDelayFill = Instance.new("Frame")
 firstDelayFill.Name = "FirstDelayFill"
-firstDelayFill.Size = UDim2.new(0, 0, 1, 0)
+firstDelayFill.Size = UDim2.new(0.03, 0, 1, 0) -- Set to 0.03 by default
 firstDelayFill.Position = UDim2.new(0, 0, 0, 0)
 firstDelayFill.BackgroundColor3 = Color3.fromRGB(255, 150, 0) -- Orange color for first shot delay
 firstDelayFill.BorderSizePixel = 0
@@ -199,10 +199,23 @@ delayButton.BackgroundTransparency = 1
 delayButton.Text = ""
 delayButton.Parent = delaySlider
 
+-- Added warning label
+local warningLabel = Instance.new("TextLabel")
+warningLabel.Name = "WarningLabel"
+warningLabel.Size = UDim2.new(1, -20, 0, 20)
+warningLabel.Position = UDim2.new(0, 10, 0, 160)
+warningLabel.BackgroundTransparency = 1
+warningLabel.Text = "Trigger Bot may not detect some players due to part hitboxes"
+warningLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+warningLabel.Font = Enum.Font.Gotham
+warningLabel.TextSize = 10
+warningLabel.TextXAlignment = Enum.TextXAlignment.Left
+warningLabel.Parent = mainFrame
+
 local keybindLabel = Instance.new("TextLabel")
 keybindLabel.Name = "KeybindLabel"
 keybindLabel.Size = UDim2.new(1, -20, 0, 20)
-keybindLabel.Position = UDim2.new(0, 10, 0, 160)
+keybindLabel.Position = UDim2.new(0, 10, 0, 180)
 keybindLabel.BackgroundTransparency = 1
 keybindLabel.Text = "Toggle GUI: Home | Toggle TriggerBot: T"
 keybindLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -248,7 +261,7 @@ local function toggleUI()
         local tween = TweenService:Create(
             mainFrame,
             TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {Size = UDim2.new(0, 220, 0, 180), Position = UDim2.new(0.5, -110, 0.5, -90)}
+            {Size = UDim2.new(0, 220, 0, 200), Position = UDim2.new(0.5, -110, 0.5, -100)}
         )
         tween:Play()
     end
