@@ -10,27 +10,20 @@ local Mouse = LocalPlayer:GetMouse()
 
 -- Try to find AutoReload variable in the game
 local AutoReload = nil
+local AutoReloadThreshold = nil
 local function findAutoReload()
-    -- Check in ReplicatedFirst
-    if ReplicatedStorage:FindFirstChild("AutoReload") then
-        return ReplicatedStorage.AutoReload
+    while not LocalPlayer:FindFirstChild("Settings") do
+        wait(0.1)
     end
     
-    -- Check in ReplicatedStorage
-    if ReplicatedStorage:FindFirstChild("AutoReload") then
-        return ReplicatedStorage.AutoReload
+    local settingsFolder = LocalPlayer:FindFirstChild("Settings")
+    if settingsFolder then
+        AutoReload = settingsFolder:FindFirstChild("AutoReload")
+        AutoReloadThreshold = settingsFolder:FindFirstChild("AutoReloadThreshold")
     end
     
-    -- Check in other common places
-    for _, service in pairs({workspace, game:GetService("StarterPack"), game:GetService("StarterGui")}) do
-        if service:FindFirstChild("AutoReload") then
-            return service.AutoReload
-        end
-    end
-    
-    return nil
+    return AutoReload
 end
-
 AutoReload = findAutoReload()
 
 local function mouse1press()
@@ -79,7 +72,9 @@ local settings = {
     raycastInterval = 0.02,
     lastTargetCheck = 0,
     autoReloadEnabled = false,
-    waitingForFirstShot = false
+    waitingForFirstShot = false,
+    manualShooting = false,
+    lastManualShotTime = 0
 }
 
 -- UI Creation
@@ -550,6 +545,9 @@ autoReloadButton.MouseButton1Click:Connect(function()
     settings.autoReloadEnabled = not settings.autoReloadEnabled
     if AutoReload then
         AutoReload.Value = settings.autoReloadEnabled
+        if settings.autoReloadEnabled and AutoReloadThreshold then
+            AutoReloadThreshold.Value = 100
+        end
     end
     updateUI()
 end)
@@ -688,18 +686,21 @@ projectileSpeedButton.MouseButton1Down:Connect(function()
 end)
 
 -- Triggerbot Logic
-local holdingMouse = false
-local manualShooting = false
 local lastTargetPosition = nil
 local lastTargetDistance = nil
 local lastTargetTime = 0
 local spreadControlHolding = false
+local holdingMouse = false
+
+local function isManuallyShooting()
+    return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or
+           UserInputService:IsKeyDown(Enum.KeyCode.ButtonR2)
+end
 
 local function isEnemy(player, character)
     if not player or not character then return false end
     if player == LocalPlayer then return false end
     
-    -- Skip team checks if teams don't exist
     if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then
         return false
     end
@@ -719,31 +720,13 @@ local function getEnemyUnderCrosshair()
     rayParams.FilterDescendantsInstances = {LocalPlayer.Character or workspace}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
     rayParams.IgnoreWater = true
+    
+    -- Improved filtering
+    rayParams:AddToFilter(workspace.Terrain)
+    if workspace:FindFirstChild("Effects") then rayParams:AddToFilter(workspace.Effects) end
+    if workspace:FindFirstChild("Particles") then rayParams:AddToFilter(workspace.Particles) end
 
-    local maxIterations = 20
-    local iterations = 0
     local result = workspace:Raycast(origin, direction, rayParams)
-
-    while result and result.Instance and iterations < maxIterations do
-        local inst = result.Instance
-        local shouldPenetrate = inst.Transparency == 1 or 
-                              (inst:IsA("BasePart") and not inst.CanCollide) or
-                              (inst:IsA("UnionOperation") or inst:IsA("MeshPart")) and 
-                              inst.CollisionFidelity ~= Enum.CollisionFidelity.Precise or
-                              inst:IsA("TrussPart") or inst:IsA("Decal") or inst:IsA("Texture") or
-                              inst.Massless or
-                              inst.Name:lower():find("air") or inst.Name:lower():find("space") or
-                              inst.Name:lower():find("gap") or inst.Name:lower():find("invis") or
-                              inst.Name:lower():find("empty")
-
-        if shouldPenetrate then
-            table.insert(rayParams.FilterDescendantsInstances, inst)
-            iterations += 1
-            result = workspace:Raycast(origin, direction, rayParams)
-        else
-            break
-        end
-    end
 
     if result and result.Instance then
         local character = result.Instance:FindFirstAncestorOfClass("Model")
@@ -756,34 +739,37 @@ local function getEnemyUnderCrosshair()
     return false, nil, nil, nil
 end
 
-local function shouldUseSpreadControl(targetPosition)
-    if not settings.spreadControlEnabled then return false end
-    
-    local camera = workspace.CurrentCamera
-    local screenPos = camera:WorldToScreenPoint(targetPosition)
-    local mousePos = UserInputService:GetMouseLocation()
-    local distFromCrosshair = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
-    
-    return distFromCrosshair > settings.maxSpreadDistance
-end
-
 local function getTargetVelocity(character)
     local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart then
-        return humanoidRootPart.Velocity
-    end
-    return Vector3.new(0, 0, 0)
+    return humanoidRootPart and humanoidRootPart.Velocity or Vector3.new(0, 0, 0)
 end
 
 local function predictPosition(targetPosition, targetVelocity, projectileSpeed, distance)
     if not projectileSpeed or projectileSpeed <= 0 then return targetPosition end
-    
-    local timeToTarget = distance / projectileSpeed
-    -- Simple prediction: assume target continues at current velocity
-    return targetPosition + (targetVelocity * timeToTarget)
+    return targetPosition + (targetVelocity * (distance / projectileSpeed))
 end
 
 local function handleShooting()
+    -- Manual shooting takes priority
+    if isManuallyShooting() then
+        settings.manualShooting = true
+        settings.lastManualShotTime = tick()
+        
+        if holdingMouse then
+            mouse1release()
+            holdingMouse = false
+            settings.waitingForFirstShot = false
+            settings.firstShotFired = false
+        end
+        return
+    else
+        -- Brief delay after manual shooting
+        if settings.manualShooting and (tick() - settings.lastManualShotTime) < 0.2 then
+            return
+        end
+        settings.manualShooting = false
+    end
+
     if not settings.enabled or not settings.triggerOn then
         if holdingMouse then
             mouse1release()
@@ -798,30 +784,28 @@ local function handleShooting()
     local hasEnemy, enemyPosition, enemyDistance, enemyCharacter = getEnemyUnderCrosshair()
 
     if hasEnemy then
-        -- Apply projectile prediction if enabled
+        -- Apply projectile prediction
         if settings.projectilePredictionEnabled then
-            local targetVelocity = getTargetVelocity(enemyCharacter)
-            enemyPosition = predictPosition(enemyPosition, targetVelocity, settings.projectileSpeed, enemyDistance)
+            enemyPosition = predictPosition(enemyPosition, getTargetVelocity(enemyCharacter), settings.projectileSpeed, enemyDistance)
         end
 
-        -- Handle first shot delay
+        -- First shot delay
         if not settings.firstShotFired and not settings.waitingForFirstShot then
             settings.targetDetectedTime = currentTime
             settings.waitingForFirstShot = true
             return
         end
 
-        -- Check if we're still waiting for first shot delay
         if settings.waitingForFirstShot then
             if (currentTime - settings.targetDetectedTime) >= settings.firstShotDelay then
                 settings.waitingForFirstShot = false
                 settings.firstShotFired = true
             else
-                return -- Still waiting for first shot delay
+                return
             end
         end
 
-        -- Check regular shot delay
+        -- Regular shooting
         if (currentTime - settings.lastShotTime) >= settings.shootDelay then
             if not holdingMouse then
                 mouse1press()
@@ -830,7 +814,7 @@ local function handleShooting()
             end
         end
     else
-        -- Reset first shot tracking when no target
+        -- No target found
         settings.waitingForFirstShot = false
         settings.firstShotFired = false
         
@@ -843,16 +827,18 @@ end
 
 -- Main loop
 RunService.RenderStepped:Connect(function()
-    -- Handle auto-reload if enabled
-    if settings.autoReloadEnabled and AutoReload then
+    -- Auto-reload handling
+    if settings.autoReloadEnabled and AutoReload and not isManuallyShooting() then
         AutoReload.Value = true
+        if AutoReloadThreshold then
+            AutoReloadThreshold.Value = 100
+        end
     end
     
-    -- Handle shooting logic
     handleShooting()
 end)
 
--- Keybind handling
+-- Keybinds
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
@@ -870,10 +856,5 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- Initialize AutoReload if found
-if AutoReload then
-    AutoReload.Value = settings.autoReloadEnabled
-end
-
--- Initial UI update
+-- Initialize
 updateUI()
