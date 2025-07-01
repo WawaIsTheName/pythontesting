@@ -26,7 +26,7 @@ local settings = {
     firstShotFired = false,
     projectilePredictionEnabled = false,
     projectilePredictionKey = Enum.KeyCode.P,
-    projectileSpeed = 1000,
+    projectileSpeed = 60,
     lastProjectileFireTime = 0,
     projectileFireDelay = 0
 }
