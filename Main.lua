@@ -9,15 +9,20 @@ local Mouse = LocalPlayer:GetMouse()
 
 -- Settings
 local settings = {
-    enabled = false,
+    enabled = true, -- Enabled by default
     triggerOn = true, -- Automatically turn on when script starts
     toggleKey = Enum.KeyCode.Home,
     triggerToggleKey = Enum.KeyCode.T,
     shootDelay = 0, -- Default delay between shots in seconds
-    firstShotDelay = 0.03, -- Changed to 0.03 as requested
+    firstShotDelay = 0.02, -- Changed to 0.02 as requested
     lastShotTime = 0,
     targetDetectedTime = 0,
-    hasTarget = false
+    hasTarget = false,
+    spreadControlEnabled = false, -- New spread control feature
+    spreadControlToggleKey = Enum.KeyCode.B, -- Changed to B
+    lastSpreadShotTime = 0,
+    spreadShotInterval = 0, -- Time between spread control shots
+    maxSpreadDistance = 5 -- Maximum distance from crosshair to consider for spread control
 }
 
 -- UI Creation
@@ -27,13 +32,16 @@ screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 240, 0, 200) -- Increased height for new warning label
-mainFrame.Position = UDim2.new(0.5, -110, 0.5, -90)
+mainFrame.Size = UDim2.new(0, 370, 0, 320) -- Increased height for new sliders
+mainFrame.Position = UDim2.new(0.5, -185, 0.5, -160)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
 mainFrame.Visible = false
 mainFrame.Parent = screenGui
+
+-- Store the last position when dragging
+local lastPosition = mainFrame.Position
 
 -- Make frame draggable
 local dragging
@@ -43,7 +51,9 @@ local startPos
 
 local function updateInput(input)
     local delta = input.Position - dragStart
-    mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    local newPosition = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    mainFrame.Position = newPosition
+    lastPosition = newPosition -- Update last position when dragging
 end
 
 mainFrame.InputBegan:Connect(function(input)
@@ -91,7 +101,7 @@ toggleButton.Size = UDim2.new(0.9, 0, 0, 25)
 toggleButton.Position = UDim2.new(0.05, 0, 0, 35)
 toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 toggleButton.BorderSizePixel = 0
-toggleButton.Text = "Enable Triggerbot"
+toggleButton.Text = "Disable Triggerbot"
 toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleButton.Font = Enum.Font.Gotham
 toggleButton.TextSize = 12
@@ -102,18 +112,31 @@ triggerStatusLabel.Name = "TriggerStatusLabel"
 triggerStatusLabel.Size = UDim2.new(1, -20, 0, 20)
 triggerStatusLabel.Position = UDim2.new(0, 10, 0, 65)
 triggerStatusLabel.BackgroundTransparency = 1
-triggerStatusLabel.Text = "Active: ON (Press T)" -- Changed to ON by default
-triggerStatusLabel.TextColor3 = Color3.fromRGB(50, 255, 50) -- Green since it's on by default
+triggerStatusLabel.Text = "Active: ON (Press T)"
+triggerStatusLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
 triggerStatusLabel.Font = Enum.Font.Gotham
 triggerStatusLabel.TextSize = 12
 triggerStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 triggerStatusLabel.Parent = mainFrame
 
+-- Spread Control Toggle
+local spreadControlButton = Instance.new("TextButton")
+spreadControlButton.Name = "SpreadControlButton"
+spreadControlButton.Size = UDim2.new(0.9, 0, 0, 25)
+spreadControlButton.Position = UDim2.new(0.05, 0, 0, 90)
+spreadControlButton.BackgroundColor3 = settings.spreadControlEnabled and Color3.fromRGB(50, 120, 50) or Color3.fromRGB(120, 50, 50)
+spreadControlButton.BorderSizePixel = 0
+spreadControlButton.Text = settings.spreadControlEnabled and "Spread Control: ON (B)" or "Spread Control: OFF (B)" -- Changed to B
+spreadControlButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+spreadControlButton.Font = Enum.Font.Gotham
+spreadControlButton.TextSize = 12
+spreadControlButton.Parent = mainFrame
+
 -- First Shot Delay slider
 local firstDelaySlider = Instance.new("Frame")
 firstDelaySlider.Name = "FirstDelaySlider"
 firstDelaySlider.Size = UDim2.new(0.9, 0, 0, 30)
-firstDelaySlider.Position = UDim2.new(0.05, 0, 0, 90)
+firstDelaySlider.Position = UDim2.new(0.05, 0, 0, 120)
 firstDelaySlider.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 firstDelaySlider.BorderSizePixel = 0
 firstDelaySlider.Parent = mainFrame
@@ -123,7 +146,7 @@ firstDelayTitle.Name = "FirstDelayTitle"
 firstDelayTitle.Size = UDim2.new(1, 0, 0.5, 0)
 firstDelayTitle.Position = UDim2.new(0, 0, 0, 0)
 firstDelayTitle.BackgroundTransparency = 1
-firstDelayTitle.Text = "First Shot Delay: 0.03s" -- Updated to show 0.03 by default
+firstDelayTitle.Text = "First Shot Delay: 0.02s"
 firstDelayTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
 firstDelayTitle.Font = Enum.Font.Gotham
 firstDelayTitle.TextSize = 12
@@ -140,7 +163,7 @@ firstDelayBar.Parent = firstDelaySlider
 
 local firstDelayFill = Instance.new("Frame")
 firstDelayFill.Name = "FirstDelayFill"
-firstDelayFill.Size = UDim2.new(0.03, 0, 1, 0) -- Set to 0.03 by default
+firstDelayFill.Size = UDim2.new(0.02, 0, 1, 0) -- Set to 0.02 by default
 firstDelayFill.Position = UDim2.new(0, 0, 0, 0)
 firstDelayFill.BackgroundColor3 = Color3.fromRGB(255, 150, 0) -- Orange color for first shot delay
 firstDelayFill.BorderSizePixel = 0
@@ -158,7 +181,7 @@ firstDelayButton.Parent = firstDelaySlider
 local delaySlider = Instance.new("Frame")
 delaySlider.Name = "DelaySlider"
 delaySlider.Size = UDim2.new(0.9, 0, 0, 30)
-delaySlider.Position = UDim2.new(0.05, 0, 0, 125)
+delaySlider.Position = UDim2.new(0.05, 0, 0, 155)
 delaySlider.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 delaySlider.BorderSizePixel = 0
 delaySlider.Parent = mainFrame
@@ -199,11 +222,101 @@ delayButton.BackgroundTransparency = 1
 delayButton.Text = ""
 delayButton.Parent = delaySlider
 
+-- Spread Shot Interval slider
+local spreadIntervalSlider = Instance.new("Frame")
+spreadIntervalSlider.Name = "SpreadIntervalSlider"
+spreadIntervalSlider.Size = UDim2.new(0.9, 0, 0, 30)
+spreadIntervalSlider.Position = UDim2.new(0.05, 0, 0, 190)
+spreadIntervalSlider.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+spreadIntervalSlider.BorderSizePixel = 0
+spreadIntervalSlider.Parent = mainFrame
+
+local spreadIntervalTitle = Instance.new("TextLabel")
+spreadIntervalTitle.Name = "SpreadIntervalTitle"
+spreadIntervalTitle.Size = UDim2.new(1, 0, 0.5, 0)
+spreadIntervalTitle.Position = UDim2.new(0, 0, 0, 0)
+spreadIntervalTitle.BackgroundTransparency = 1
+spreadIntervalTitle.Text = "Spread Interval: 0s"
+spreadIntervalTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+spreadIntervalTitle.Font = Enum.Font.Gotham
+spreadIntervalTitle.TextSize = 12
+spreadIntervalTitle.TextXAlignment = Enum.TextXAlignment.Left
+spreadIntervalTitle.Parent = spreadIntervalSlider
+
+local spreadIntervalBar = Instance.new("Frame")
+spreadIntervalBar.Name = "SpreadIntervalBar"
+spreadIntervalBar.Size = UDim2.new(1, 0, 0, 5)
+spreadIntervalBar.Position = UDim2.new(0, 0, 0.5, 5)
+spreadIntervalBar.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+spreadIntervalBar.BorderSizePixel = 0
+spreadIntervalBar.Parent = spreadIntervalSlider
+
+local spreadIntervalFill = Instance.new("Frame")
+spreadIntervalFill.Name = "SpreadIntervalFill"
+spreadIntervalFill.Size = UDim2.new(settings.spreadShotInterval / 0.5, 0, 1, 0) -- Max 0.5 seconds
+spreadIntervalFill.Position = UDim2.new(0, 0, 0, 0)
+spreadIntervalFill.BackgroundColor3 = Color3.fromRGB(150, 0, 255) -- Purple color
+spreadIntervalFill.BorderSizePixel = 0
+spreadIntervalFill.Parent = spreadIntervalBar
+
+local spreadIntervalButton = Instance.new("TextButton")
+spreadIntervalButton.Name = "SpreadIntervalButton"
+spreadIntervalButton.Size = UDim2.new(1, 0, 0.5, 0)
+spreadIntervalButton.Position = UDim2.new(0, 0, 0.5, 5)
+spreadIntervalButton.BackgroundTransparency = 1
+spreadIntervalButton.Text = ""
+spreadIntervalButton.Parent = spreadIntervalSlider
+
+-- Max Spread Distance slider
+local spreadDistanceSlider = Instance.new("Frame")
+spreadDistanceSlider.Name = "SpreadDistanceSlider"
+spreadDistanceSlider.Size = UDim2.new(0.9, 0, 0, 30)
+spreadDistanceSlider.Position = UDim2.new(0.05, 0, 0, 225)
+spreadDistanceSlider.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+spreadDistanceSlider.BorderSizePixel = 0
+spreadDistanceSlider.Parent = mainFrame
+
+local spreadDistanceTitle = Instance.new("TextLabel")
+spreadDistanceTitle.Name = "SpreadDistanceTitle"
+spreadDistanceTitle.Size = UDim2.new(1, 0, 0.5, 0)
+spreadDistanceTitle.Position = UDim2.new(0, 0, 0, 0)
+spreadDistanceTitle.BackgroundTransparency = 1
+spreadDistanceTitle.Text = "Max Spread: 5px"
+spreadDistanceTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+spreadDistanceTitle.Font = Enum.Font.Gotham
+spreadDistanceTitle.TextSize = 12
+spreadDistanceTitle.TextXAlignment = Enum.TextXAlignment.Left
+spreadDistanceTitle.Parent = spreadDistanceSlider
+
+local spreadDistanceBar = Instance.new("Frame")
+spreadDistanceBar.Name = "SpreadDistanceBar"
+spreadDistanceBar.Size = UDim2.new(1, 0, 0, 5)
+spreadDistanceBar.Position = UDim2.new(0, 0, 0.5, 5)
+spreadDistanceBar.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+spreadDistanceBar.BorderSizePixel = 0
+spreadDistanceBar.Parent = spreadDistanceSlider
+
+local spreadDistanceFill = Instance.new("Frame")
+spreadDistanceFill.Name = "SpreadDistanceFill"
+spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 20, 0, 1, 0) -- Max 20px
+spreadDistanceFill.Position = UDim2.new(0, 0, 0, 0)
+spreadDistanceFill.BackgroundColor3 = Color3.fromRGB(255, 0, 150) -- Pink color
+spreadDistanceFill.BorderSizePixel = 0
+spreadDistanceFill.Parent = spreadDistanceBar
+
+local spreadDistanceButton = Instance.new("TextButton")
+spreadDistanceButton.Name = "SpreadDistanceButton"
+spreadDistanceButton.Size = UDim2.new(1, 0, 0.5, 0)
+spreadDistanceButton.Position = UDim2.new(0, 0, 0.5, 5)
+spreadDistanceButton.BackgroundTransparency = 1
+spreadDistanceButton.Text = ""
+spreadDistanceButton.Parent = spreadDistanceSlider
+
 -- Added warning label
 local warningLabel = Instance.new("TextLabel")
 warningLabel.Name = "WarningLabel"
 warningLabel.Size = UDim2.new(1, -20, 0, 20)
-warningLabel.Position = UDim2.new(0, 10, 0, 160)
+warningLabel.Position = UDim2.new(0, 10, 0, 260)
 warningLabel.BackgroundTransparency = 1
 warningLabel.Text = "Trigger Bot may not detect some players due to part hitboxes"
 warningLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -215,9 +328,9 @@ warningLabel.Parent = mainFrame
 local keybindLabel = Instance.new("TextLabel")
 keybindLabel.Name = "KeybindLabel"
 keybindLabel.Size = UDim2.new(1, -20, 0, 20)
-keybindLabel.Position = UDim2.new(0, 10, 0, 180)
+keybindLabel.Position = UDim2.new(0, 10, 0, 280)
 keybindLabel.BackgroundTransparency = 1
-keybindLabel.Text = "Toggle GUI: Home | Toggle TriggerBot: T"
+keybindLabel.Text = "Toggle GUI: Home | Toggle TriggerBot: T | Spread Control: B"
 keybindLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
 keybindLabel.Font = Enum.Font.Gotham
 keybindLabel.TextSize = 10
@@ -250,18 +363,30 @@ local function updateUI()
     
     delayTitle.Text = "Shot Delay: " .. string.format("%.2f", settings.shootDelay) .. "s"
     delayFill.Size = UDim2.new(settings.shootDelay, 0, 1, 0)
+    
+    -- Update spread control button
+    spreadControlButton.Text = settings.spreadControlEnabled and "Spread Control: ON (B)" or "Spread Control: OFF (B)"
+    spreadControlButton.BackgroundColor3 = settings.spreadControlEnabled and Color3.fromRGB(50, 120, 50) or Color3.fromRGB(120, 50, 50)
+    
+    -- Update spread interval slider
+    spreadIntervalTitle.Text = "Spread Interval: " .. string.format("%.1f", settings.spreadShotInterval) .. "s"
+    spreadIntervalFill.Size = UDim2.new(settings.spreadShotInterval / 0.5, 0, 1, 0) -- Max 0.5 seconds
+    
+    -- Update spread distance slider
+    spreadDistanceTitle.Text = "Max Spread: " .. string.format("%.0f", settings.maxSpreadDistance) .. "px"
+    spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 20, 0, 1, 0) -- Max 20px
 end
 
 local function toggleUI()
     mainFrame.Visible = not mainFrame.Visible
     if mainFrame.Visible then
-        -- Animate appearance
+        -- Use last position instead of resetting to center
         mainFrame.Size = UDim2.new(0, 0, 0, 0)
-        mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+        mainFrame.Position = lastPosition
         local tween = TweenService:Create(
             mainFrame,
             TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {Size = UDim2.new(0, 220, 0, 200), Position = UDim2.new(0.5, -110, 0.5, -100)}
+            {Size = UDim2.new(0, 370, 0, 320)}
         )
         tween:Play()
     end
@@ -278,15 +403,39 @@ toggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
+spreadControlButton.MouseButton1Click:Connect(function()
+    settings.spreadControlEnabled = not settings.spreadControlEnabled
+    updateUI()
+end)
+
 local function updateSlider(input, sliderType)
-    local bar = sliderType == "firstDelay" and firstDelayBar or delayBar
+    local bar, maxValue
+    if sliderType == "firstDelay" then
+        bar = firstDelayBar
+        maxValue = 1
+    elseif sliderType == "delay" then
+        bar = delayBar
+        maxValue = 1
+    elseif sliderType == "spreadInterval" then
+        bar = spreadIntervalBar
+        maxValue = 0.5 -- Max 0.5 seconds
+    elseif sliderType == "spreadDistance" then
+        bar = spreadDistanceBar
+        maxValue = 20 -- Max 20px
+    end
+    
     local relativeX = input.Position.X - bar.AbsolutePosition.X
     local percentage = math.clamp(relativeX / bar.AbsoluteSize.X, 0, 1)
+    local value = percentage * maxValue
     
     if sliderType == "firstDelay" then
-        settings.firstShotDelay = percentage
-    else
-        settings.shootDelay = percentage
+        settings.firstShotDelay = value
+    elseif sliderType == "delay" then
+        settings.shootDelay = value
+    elseif sliderType == "spreadInterval" then
+        settings.spreadShotInterval = value
+    elseif sliderType == "spreadDistance" then
+        settings.maxSpreadDistance = value
     end
     
     updateUI()
@@ -330,9 +479,51 @@ delayButton.MouseButton1Down:Connect(function()
     end)
 end)
 
+spreadIntervalButton.MouseButton1Down:Connect(function()
+    updateSlider({Position = UserInputService:GetMouseLocation()}, "spreadInterval")
+    
+    local connection
+    connection = UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input, "spreadInterval")
+        end
+    end)
+    
+    local releaseConnection
+    releaseConnection = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            connection:Disconnect()
+            releaseConnection:Disconnect()
+        end
+    end)
+end)
+
+spreadDistanceButton.MouseButton1Down:Connect(function()
+    updateSlider({Position = UserInputService:GetMouseLocation()}, "spreadDistance")
+    
+    local connection
+    connection = UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input, "spreadDistance")
+        end
+    end)
+    
+    local releaseConnection
+    releaseConnection = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            connection:Disconnect()
+            releaseConnection:Disconnect()
+        end
+    end)
+end)
+
 -- Triggerbot Logic
 local holdingMouse = false
 local manualShooting = false
+local lastTargetPosition = nil
+local lastTargetDistance = nil
+local lastTargetTime = 0
+local spreadControlHolding = false
 
 UserInputService.InputBegan:Connect(function(input, isProcessed)
     if not isProcessed then
@@ -350,6 +541,12 @@ UserInputService.InputBegan:Connect(function(input, isProcessed)
                 mouse1release()
                 holdingMouse = false
             end
+        end
+        
+        -- Toggle spread control
+        if settings.enabled and input.KeyCode == settings.spreadControlToggleKey then
+            settings.spreadControlEnabled = not settings.spreadControlEnabled
+            updateUI()
         end
     end
 
@@ -374,7 +571,7 @@ local function isEnemy(player, character)
     return false
 end
 
-local function isEnemyUnderCrosshair()
+local function getEnemyUnderCrosshair()
     local camera = workspace.CurrentCamera
     local origin = camera.CFrame.Position
     local direction = (Mouse.Hit.Position - origin).Unit * 1000
@@ -420,17 +617,46 @@ local function isEnemyUnderCrosshair()
         local character = result.Instance:FindFirstAncestorOfClass("Model")
         local player = Players:GetPlayerFromCharacter(character)
         if isEnemy(player, character) then
-            return true
+            return true, result.Position, (result.Position - origin).Magnitude
         end
     end
 
+    return false, nil, nil
+end
+
+local function shouldUseSpreadControl(currentTime, targetPosition, targetDistance)
+    if not settings.spreadControlEnabled then return false end
+    
+    -- If we don't have previous target data, don't use spread control
+    if not lastTargetPosition or not lastTargetDistance then return false end
+    
+    -- Calculate how much the target has moved relative to crosshair
+    local camera = workspace.CurrentCamera
+    local screenPos1 = camera:WorldToScreenPoint(lastTargetPosition)
+    local screenPos2 = camera:WorldToScreenPoint(targetPosition)
+    
+    local mousePos = UserInputService:GetMouseLocation()
+    local distFromCrosshair1 = (Vector2.new(screenPos1.X, screenPos1.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+    local distFromCrosshair2 = (Vector2.new(screenPos2.X, screenPos2.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+    
+    -- If target is moving away from crosshair or is outside our max spread distance
+    if (distFromCrosshair2 > distFromCrosshair1 and distFromCrosshair2 > 5) or distFromCrosshair2 > settings.maxSpreadDistance then
+        return true
+    end
+    
+    -- If it's been a while since we last shot (to maintain spread)
+    if (currentTime - lastTargetTime) > 0.5 then
+        return true
+    end
+    
     return false
 end
 
 RunService.RenderStepped:Connect(function()
+    local currentTime = tick()
+    
     if settings.enabled and settings.triggerOn and not manualShooting then
-        local currentTime = tick()
-        local hasEnemy = isEnemyUnderCrosshair()
+        local hasEnemy, enemyPosition, enemyDistance = getEnemyUnderCrosshair()
         
         if hasEnemy then
             if not settings.hasTarget then
@@ -450,6 +676,20 @@ RunService.RenderStepped:Connect(function()
                     holdingMouse = true
                 end
                 settings.lastShotTime = currentTime
+                lastTargetTime = currentTime
+                lastTargetPosition = enemyPosition
+                lastTargetDistance = enemyDistance
+            end
+            
+            -- Spread control logic
+            if settings.spreadControlEnabled and (currentTime - settings.lastSpreadShotTime) >= settings.spreadShotInterval then
+                if shouldUseSpreadControl(currentTime, enemyPosition, enemyDistance) then
+                    if not spreadControlHolding then
+                        mouse1press()
+                        spreadControlHolding = true
+                    end
+                    settings.lastSpreadShotTime = currentTime
+                end
             end
         else
             settings.hasTarget = false
@@ -457,12 +697,24 @@ RunService.RenderStepped:Connect(function()
                 mouse1release()
                 holdingMouse = false
             end
+            
+            -- Release spread control if no target
+            if spreadControlHolding then
+                mouse1release()
+                spreadControlHolding = false
+            end
         end
     else
         settings.hasTarget = false
         if holdingMouse then
             mouse1release()
             holdingMouse = false
+        end
+        
+        -- Release spread control if triggerbot is off
+        if spreadControlHolding then
+            mouse1release()
+            spreadControlHolding = false
         end
     end
 end)
