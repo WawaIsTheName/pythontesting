@@ -691,6 +691,8 @@ local lastTargetDistance = nil
 local lastTargetTime = 0
 local spreadControlHolding = false
 local holdingMouse = false
+local lastTargetCheck = 0
+local targetDetected = false
 
 local function isManuallyShooting()
     return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or
@@ -784,12 +786,15 @@ local function predictPosition(targetPosition, targetVelocity, projectileSpeed, 
 end
 
 local function handleShooting()
+    local currentTime = tick()
+    
     -- Manual shooting takes priority
     if isManuallyShooting() then
         manualShooting = true
         if holdingMouse then
             mouse1release()
             holdingMouse = false
+            targetDetected = false
         end
         return
     else
@@ -800,14 +805,18 @@ local function handleShooting()
         if holdingMouse then
             mouse1release()
             holdingMouse = false
+            targetDetected = false
         end
         return
     end
 
-    local currentTime = tick()
-    local enemyDetected = isEnemyUnderCrosshair()
+    -- Only check for targets at the specified interval
+    if (currentTime - lastTargetCheck) >= settings.raycastInterval then
+        targetDetected = isEnemyUnderCrosshair()
+        lastTargetCheck = currentTime
+    end
 
-    if enemyDetected then
+    if targetDetected then
         -- First shot delay handling
         if settings.firstShotDelay > 0 and not settings.waitingForFirstShot and not holdingMouse then
             settings.targetDetectedTime = currentTime
@@ -824,12 +833,12 @@ local function handleShooting()
         end
 
         -- Regular shooting with delay
-        if (currentTime - settings.lastShotTime) >= settings.shootDelay then
+        if not holdingMouse or (settings.shootDelay > 0 and (currentTime - settings.lastShotTime) >= settings.shootDelay) then
             if not holdingMouse then
                 mouse1press()
                 holdingMouse = true
-                settings.lastShotTime = currentTime
             end
+            settings.lastShotTime = currentTime
         end
     else
         -- No target found
