@@ -21,9 +21,9 @@ local settings = {
     spreadControlEnabled = false,
     spreadControlToggleKey = Enum.KeyCode.B,
     lastSpreadShotTime = 0,
-    spreadShotInterval = 0, -- Changed to 0 (no delay)
-    maxSpreadDistance = 5,
-    firstShotFired = false -- Added to track first shot
+    spreadShotInterval = 0,
+    maxSpreadDistance = 100, -- Increased to 100px
+    firstShotFired = false
 }
 
 -- UI Creation
@@ -521,46 +521,10 @@ local lastTargetDistance = nil
 local lastTargetTime = 0
 local spreadControlHolding = false
 
-UserInputService.InputBegan:Connect(function(input, isProcessed)
-    if not isProcessed then
-        if input.KeyCode == settings.toggleKey then
-            toggleUI()
-        end
-        
-        if settings.enabled and input.KeyCode == settings.triggerToggleKey then
-            settings.triggerOn = not settings.triggerOn
-            settings.hasTarget = false
-            updateUI()
-            if not settings.triggerOn and holdingMouse then
-                mouse1release()
-                holdingMouse = false
-            end
-        end
-        
-        if settings.enabled and input.KeyCode == settings.spreadControlToggleKey then
-            settings.spreadControlEnabled = not settings.spreadControlEnabled
-            updateUI()
-        end
-    end
-
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        manualShooting = true
-        settings.firstShotFired = false -- Reset first shot flag when manually shooting
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        manualShooting = false
-    end
-end)
-
 local function isEnemy(player, character)
     if player and player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            return true
-        end
+        return humanoid and humanoid.Health > 0
     end
     return false
 end
@@ -577,26 +541,19 @@ local function getEnemyUnderCrosshair()
 
     local maxIterations = 20
     local iterations = 0
-
     local result = workspace:Raycast(origin, direction, rayParams)
 
     while result and result.Instance and iterations < maxIterations do
         local inst = result.Instance
-        local isStandardPart = inst:IsA("BasePart")
-        local isUnionOrMesh = inst:IsA("UnionOperation") or inst:IsA("MeshPart")
-        
-        local shouldPenetrate =
-            inst.Transparency == 1 or
-            (isStandardPart and not inst.CanCollide) or
-            (isUnionOrMesh and inst.CollisionFidelity ~= Enum.CollisionFidelity.Precise) or
-            inst:IsA("TrussPart") or
-            inst:IsA("Decal") or inst:IsA("Texture") or
-            inst.Massless or
-            (inst.Name:lower():find("air") or
-             inst.Name:lower():find("space") or
-             inst.Name:lower():find("gap") or
-             inst.Name:lower():find("invis") or
-             inst.Name:lower():find("empty"))
+        local shouldPenetrate = inst.Transparency == 1 or 
+                              (inst:IsA("BasePart") and not inst.CanCollide) or
+                              (inst:IsA("UnionOperation") or inst:IsA("MeshPart")) and 
+                              inst.CollisionFidelity ~= Enum.CollisionFidelity.Precise or
+                              inst:IsA("TrussPart") or inst:IsA("Decal") or inst:IsA("Texture") or
+                              inst.Massless or
+                              inst.Name:lower():find("air") or inst.Name:lower():find("space") or
+                              inst.Name:lower():find("gap") or inst.Name:lower():find("invis") or
+                              inst.Name:lower():find("empty")
 
         if shouldPenetrate then
             table.insert(rayParams.FilterDescendantsInstances, inst)
@@ -618,27 +575,65 @@ local function getEnemyUnderCrosshair()
     return false, nil, nil
 end
 
-local function shouldUseSpreadControl(currentTime, targetPosition, targetDistance)
+local function shouldUseSpreadControl(targetPosition)
     if not settings.spreadControlEnabled then return false end
-    if not lastTargetPosition or not lastTargetDistance then return false end
     
     local camera = workspace.CurrentCamera
-    local screenPos1 = camera:WorldToScreenPoint(lastTargetPosition)
-    local screenPos2 = camera:WorldToScreenPoint(targetPosition)
-    
+    local screenPos = camera:WorldToScreenPoint(targetPosition)
     local mousePos = UserInputService:GetMouseLocation()
-    local distFromCrosshair1 = (Vector2.new(screenPos1.X, screenPos1.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
-    local distFromCrosshair2 = (Vector2.new(screenPos2.X, screenPos2.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+    local distFromCrosshair = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
     
-    if (distFromCrosshair2 > distFromCrosshair1 and distFromCrosshair2 > 5) or distFromCrosshair2 > settings.maxSpreadDistance then
-        return true
+    return distFromCrosshair > settings.maxSpreadDistance
+end
+
+local function handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistance)
+    if hasEnemy then
+        if not settings.hasTarget then
+            -- New target detected
+            settings.hasTarget = true
+            settings.targetDetectedTime = currentTime
+            settings.firstShotFired = false
+            holdingMouse = false
+        end
+
+        -- First shot delay check
+        local firstDelayPassed = (currentTime - settings.targetDetectedTime) >= settings.firstShotDelay
+        local regularDelayPassed = (currentTime - settings.lastShotTime) >= settings.shootDelay
+
+        -- Main triggerbot shooting logic
+        if (firstDelayPassed or settings.firstShotFired) and regularDelayPassed then
+            if not holdingMouse then
+                mouse1press()
+                holdingMouse = true
+            end
+            settings.lastShotTime = currentTime
+            settings.firstShotFired = true
+            lastTargetPosition = enemyPosition
+            lastTargetDistance = enemyDistance
+        end
+
+        -- Spread control logic - fires continuously when enabled and target is in range
+        if settings.spreadControlEnabled and shouldUseSpreadControl(enemyPosition) then
+            if not spreadControlHolding then
+                mouse1press()
+                spreadControlHolding = true
+            end
+        elseif spreadControlHolding then
+            mouse1release()
+            spreadControlHolding = false
+        end
+    else
+        -- No target detected
+        if holdingMouse then
+            mouse1release()
+            holdingMouse = false
+        end
+        if spreadControlHolding then
+            mouse1release()
+            spreadControlHolding = false
+        end
+        settings.hasTarget = false
     end
-    
-    if (currentTime - lastTargetTime) > 0.5 then
-        return true
-    end
-    
-    return false
 end
 
 RunService.RenderStepped:Connect(function()
@@ -646,64 +641,17 @@ RunService.RenderStepped:Connect(function()
     
     if settings.enabled and settings.triggerOn and not manualShooting then
         local hasEnemy, enemyPosition, enemyDistance = getEnemyUnderCrosshair()
-        
-        if hasEnemy then
-            if not settings.hasTarget then
-                settings.hasTarget = true
-                settings.targetDetectedTime = currentTime
-                settings.firstShotFired = false -- Reset first shot flag when new target detected
-            end
-            
-            -- First shot delay logic
-            local firstDelayPassed = (currentTime - settings.targetDetectedTime) >= settings.firstShotDelay
-            local regularDelayPassed = (currentTime - settings.lastShotTime) >= settings.shootDelay
-            
-            -- Only shoot if first delay has passed or it's not the first shot
-            if (firstDelayPassed or settings.firstShotFired) and regularDelayPassed then
-                if not holdingMouse then
-                    mouse1press()
-                    holdingMouse = true
-                end
-                settings.lastShotTime = currentTime
-                lastTargetTime = currentTime
-                lastTargetPosition = enemyPosition
-                lastTargetDistance = enemyDistance
-                settings.firstShotFired = true -- Mark first shot as fired
-            end
-            
-            -- Spread control logic (now with 0 delay by default)
-            if settings.spreadControlEnabled and (currentTime - settings.lastSpreadShotTime) >= settings.spreadShotInterval then
-                if shouldUseSpreadControl(currentTime, enemyPosition, enemyDistance) then
-                    if not spreadControlHolding then
-                        mouse1press()
-                        spreadControlHolding = true
-                    end
-                    settings.lastSpreadShotTime = currentTime
-                end
-            end
-        else
-            settings.hasTarget = false
-            if holdingMouse then
-                mouse1release()
-                holdingMouse = false
-            end
-            
-            if spreadControlHolding then
-                mouse1release()
-                spreadControlHolding = false
-            end
-        end
+        handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistance)
     else
-        settings.hasTarget = false
         if holdingMouse then
             mouse1release()
             holdingMouse = false
         end
-        
         if spreadControlHolding then
             mouse1release()
             spreadControlHolding = false
         end
+        settings.hasTarget = false
     end
 end)
 
