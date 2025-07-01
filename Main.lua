@@ -712,32 +712,46 @@ end
 local function isEnemyUnderCrosshair()
     local camera = workspace.CurrentCamera
     local viewportSize = camera.ViewportSize
+    
+    -- Get the center of the screen
     local screenCenter = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
     
-    -- First try using the screen center raycast
+    -- Create a ray from the camera through the center of the screen
     local ray = camera:ViewportPointToRay(screenCenter.X, screenCenter.Y)
     local origin = ray.Origin
-    local direction = ray.Direction * 1000
+    local direction = ray.Direction * 2000  -- Increased ray distance
 
     local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character or {}}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
     rayParams.IgnoreWater = true
 
-    local maxIterations = 50
+    -- More aggressive part skipping
+    local maxIterations = 100
     local iterations = 0
-
     local result = workspace:Raycast(origin, direction, rayParams)
 
-    -- Skip invisible or transparent parts and allow skipping unions with holes
+    -- Skip through transparent parts and unions
     while result and result.Instance and iterations < maxIterations do
         local inst = result.Instance
+        local shouldSkip = false
+        
+        -- Skip if part is transparent
+        if inst.Transparency > 0.1 then
+            shouldSkip = true
+        end
+        
+        -- Skip if part is a union with box collision
+        if inst:IsA("UnionOperation") and inst.CollisionFidelity == Enum.CollisionFidelity.Box then
+            shouldSkip = true
+        end
+        
+        -- Skip if part is in a no-collision group
+        if inst:IsA("BasePart") and not inst.CanCollide then
+            shouldSkip = true
+        end
 
-        local isTransparent = inst.Transparency > 0.025
-
-        local isEmptyUnion = inst:IsA("UnionOperation") and inst.CollisionFidelity == Enum.CollisionFidelity.Box and inst:IsDescendantOf(workspace)
-
-        if isTransparent or isEmptyUnion then
+        if shouldSkip then
             table.insert(rayParams.FilterDescendantsInstances, inst)
             iterations += 1
             result = workspace:Raycast(origin, direction, rayParams)
@@ -748,35 +762,7 @@ local function isEnemyUnderCrosshair()
 
     if result and result.Instance then
         local character = result.Instance:FindFirstAncestorOfClass("Model")
-        local player = Players:GetPlayerFromCharacter(character)
-        if isEnemy(player, character) then
-            return true
-        end
-    end
-
-    -- Fallback to Mouse.Hit if screen center raycast didn't find anything
-    if Mouse and Mouse.Hit and typeof(Mouse.Hit.Position) == "Vector3" then
-        local direction = (Mouse.Hit.Position - origin).Unit * 1000
-        result = workspace:Raycast(origin, direction, rayParams)
-
-        iterations = 0
-        while result and result.Instance and iterations < maxIterations do
-            local inst = result.Instance
-
-            local isTransparent = inst.Transparency > 0.025
-            local isEmptyUnion = inst:IsA("UnionOperation") and inst.CollisionFidelity == Enum.CollisionFidelity.Box and inst:IsDescendantOf(workspace)
-
-            if isTransparent or isEmptyUnion then
-                table.insert(rayParams.FilterDescendantsInstances, inst)
-                iterations += 1
-                result = workspace:Raycast(origin, direction, rayParams)
-            else
-                break
-            end
-        end
-
-        if result and result.Instance then
-            local character = result.Instance:FindFirstAncestorOfClass("Model")
+        if character then
             local player = Players:GetPlayerFromCharacter(character)
             if isEnemy(player, character) then
                 return true
@@ -786,7 +772,6 @@ local function isEnemyUnderCrosshair()
 
     return false
 end
-
 
 local function getTargetVelocity(character)
     local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
