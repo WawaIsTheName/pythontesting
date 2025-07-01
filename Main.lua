@@ -8,28 +8,24 @@ local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
 local function mouse1press()
-    if not VirtualInputManager then
-        -- More reliable fallback
-        local vim = game:GetService("VirtualInputManager")
-        if vim then
-            vim:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, true, game, 1)
-        else
-            -- Ultimate fallback
-            mouse1click()
-        end
+    local vim = game:GetService("VirtualInputManager")
+    if vim then
+        vim:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, true, game, 1)
     else
-        VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, true, game, 1)
+        -- Fallback if VirtualInputManager isn't available
+        mouse1click()
     end
 end
 
 local function mouse1release()
-    if not VirtualInputManager then
-        -- Fallback to old method if VirtualInputManager isn't available
-        mouse1release()
+    local vim = game:GetService("VirtualInputManager")
+    if vim then
+        vim:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, false, game, 1)
     else
-        VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, false, game, 1)
+        -- Fallback if VirtualInputManager isn't available
+        keyrelease(0x01)
     end
-end 
+end
 
 -- Settings
 local settings = {
@@ -52,7 +48,10 @@ local settings = {
     projectilePredictionKey = Enum.KeyCode.P,
     projectileSpeed = 60,
     lastProjectileFireTime = 0,
-    projectileFireDelay = 0
+    projectileFireDelay = 0,
+    lastRaycastTime = 0,
+    raycastInterval = 0.02,
+    lastTargetCheck = 0
 }
 
 -- UI Creation
@@ -648,14 +647,13 @@ local function isEnemy(player, character)
     if not player or not character then return false end
     if player == LocalPlayer then return false end
     
-    -- Handle cases where teams might not exist
-    local teamCheckPassed = true
-    if LocalPlayer.Team and player.Team then
-        teamCheckPassed = LocalPlayer.Team ~= player.Team
+    -- Skip team checks if teams don't exist
+    if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then
+        return false
     end
     
     local humanoid = character:FindFirstChildOfClass("Humanoid")
-    return teamCheckPassed and humanoid and humanoid.Health > 0
+    return humanoid and humanoid.Health > 0
 end
 
 local function getEnemyUnderCrosshair()
@@ -735,7 +733,18 @@ local function predictPosition(targetPosition, targetVelocity, projectileSpeed)
     return targetPosition + (targetVelocity * timeToTarget)
 end
 
-local function handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistance, enemyCharacter)
+local function handleShooting()
+    if not settings.enabled or not settings.triggerOn then
+        if holdingMouse then
+            mouse1release()
+            holdingMouse = false
+        end
+        return
+    end
+
+    local currentTime = tick()
+    local hasEnemy, enemyPosition, enemyDistance, enemyCharacter = getEnemyUnderCrosshair()
+
     if hasEnemy then
         -- Apply projectile prediction if enabled
         if settings.projectilePredictionEnabled and (currentTime - settings.lastProjectileFireTime) > settings.projectileFireDelay then
@@ -744,67 +753,16 @@ local function handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistanc
             settings.lastProjectileFireTime = currentTime
         end
         
-        if not settings.hasTarget then
-            -- New target detected
-            settings.hasTarget = true
-            settings.targetDetectedTime = currentTime
-            settings.firstShotFired = false
-            holdingMouse = false
-        end
-
-        -- Calculate time since target was first detected
-        local timeSinceDetection = currentTime - settings.targetDetectedTime
-        
-        -- First shot delay check (only if we haven't fired the first shot yet)
-        if not settings.firstShotFired then
-            if timeSinceDetection >= settings.firstShotDelay then
-                -- First shot delay has passed - fire!
-                if not holdingMouse then
-                    mouse1press()
-                    holdingMouse = true
-                end
-                settings.lastShotTime = currentTime
-                settings.firstShotFired = true
-                lastTargetPosition = enemyPosition
-                lastTargetDistance = enemyDistance
-            end
-        else
-            -- Regular shooting after first shot
-            local regularDelayPassed = (currentTime - settings.lastShotTime) >= settings.shootDelay
-            
-            if regularDelayPassed then
-                if not holdingMouse then
-                    mouse1press()
-                    holdingMouse = true
-                end
-                settings.lastShotTime = currentTime
-                lastTargetPosition = enemyPosition
-                lastTargetDistance = enemyDistance
-            end
-        end
-
-        -- Spread control logic (independent of first shot delay)
-        if settings.spreadControlEnabled and shouldUseSpreadControl(enemyPosition) then
-            if not spreadControlHolding then
-                mouse1press()
-                spreadControlHolding = true
-            end
-        elseif spreadControlHolding then
-            mouse1release()
-            spreadControlHolding = false
+        if not holdingMouse then
+            mouse1press()
+            holdingMouse = true
+            settings.lastShotTime = currentTime
         end
     else
-        -- No target detected
         if holdingMouse then
             mouse1release()
             holdingMouse = false
         end
-        if spreadControlHolding then
-            mouse1release()
-            spreadControlHolding = false
-        end
-        settings.hasTarget = false
-        settings.firstShotFired = false
     end
 end
 
