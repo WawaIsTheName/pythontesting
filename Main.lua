@@ -9,7 +9,7 @@ local Mouse = LocalPlayer:GetMouse()
 
 -- Settings
 local settings = {
-    enabled = true,
+    enabled = false,
     triggerOn = true,
     toggleKey = Enum.KeyCode.Home,
     triggerToggleKey = Enum.KeyCode.T,
@@ -19,10 +19,10 @@ local settings = {
     targetDetectedTime = 0,
     hasTarget = false,
     spreadControlEnabled = false,
-    spreadControlToggleKey = Enum.KeyCode.B,
+    spreadControlToggleKey = Enum.KeyCode.V,
     lastSpreadShotTime = 0,
     spreadShotInterval = 0,
-    maxSpreadDistance = 100, -- Increased to 100px
+    maxSpreadDistance = 200, -- Increased to 100px
     firstShotFired = false
 }
 
@@ -127,7 +127,7 @@ spreadControlButton.Size = UDim2.new(0.9, 0, 0, 25)
 spreadControlButton.Position = UDim2.new(0.05, 0, 0, 90)
 spreadControlButton.BackgroundColor3 = settings.spreadControlEnabled and Color3.fromRGB(50, 120, 50) or Color3.fromRGB(120, 50, 50)
 spreadControlButton.BorderSizePixel = 0
-spreadControlButton.Text = settings.spreadControlEnabled and "Spread Control: ON (B)" or "Spread Control: OFF (B)"
+spreadControlButton.Text = settings.spreadControlEnabled and "Spread Control: ON (V)" or "Spread Control: OFF (V)"
 spreadControlButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 spreadControlButton.Font = Enum.Font.Gotham
 spreadControlButton.TextSize = 12
@@ -299,7 +299,7 @@ spreadDistanceBar.Parent = spreadDistanceSlider
 
 local spreadDistanceFill = Instance.new("Frame")
 spreadDistanceFill.Name = "SpreadDistanceFill"
-spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 100, 0, 1, 0) -- Changed to 100px max
+spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 200, 0, 1, 0) -- Changed to 100px max
 spreadDistanceFill.Position = UDim2.new(0, 0, 0, 0)
 spreadDistanceFill.BackgroundColor3 = Color3.fromRGB(255, 0, 150)
 spreadDistanceFill.BorderSizePixel = 0
@@ -331,7 +331,7 @@ keybindLabel.Name = "KeybindLabel"
 keybindLabel.Size = UDim2.new(1, -20, 0, 20)
 keybindLabel.Position = UDim2.new(0, 10, 0, 280)
 keybindLabel.BackgroundTransparency = 1
-keybindLabel.Text = "Toggle GUI: Home | Toggle TriggerBot: T | Spread Control: B"
+keybindLabel.Text = "Toggle GUI: Home | Toggle TriggerBot: T | Spread Control: V"
 keybindLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
 keybindLabel.Font = Enum.Font.Gotham
 keybindLabel.TextSize = 10
@@ -364,14 +364,14 @@ local function updateUI()
     delayTitle.Text = "Shot Delay: " .. string.format("%.2f", settings.shootDelay) .. "s"
     delayFill.Size = UDim2.new(settings.shootDelay, 0, 1, 0)
     
-    spreadControlButton.Text = settings.spreadControlEnabled and "Spread Control: ON (B)" or "Spread Control: OFF (B)"
+    spreadControlButton.Text = settings.spreadControlEnabled and "Spread Control: ON (V)" or "Spread Control: OFF (V)"
     spreadControlButton.BackgroundColor3 = settings.spreadControlEnabled and Color3.fromRGB(50, 120, 50) or Color3.fromRGB(120, 50, 50)
     
     spreadIntervalTitle.Text = "Spread Interval: " .. string.format("%.1f", settings.spreadShotInterval) .. "s"
     spreadIntervalFill.Size = UDim2.new(settings.spreadShotInterval / 0.5, 0, 1, 0)
     
     spreadDistanceTitle.Text = "Max Spread: " .. string.format("%.0f", settings.maxSpreadDistance) .. "px"
-    spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 100, 0, 1, 0) -- Updated to 100px max
+    spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 200, 0, 1, 0) -- Updated to 100px max
 end
 
 local function toggleUI()
@@ -417,7 +417,7 @@ local function updateSlider(input, sliderType)
         maxValue = 0.5
     elseif sliderType == "spreadDistance" then
         bar = spreadDistanceBar
-        maxValue = 100 -- Updated to 100px max
+        maxValue = 200 -- Updated to 100px max
     end
     
     local relativeX = input.Position.X - bar.AbsolutePosition.X
