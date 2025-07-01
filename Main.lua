@@ -13,7 +13,7 @@ local AutoReload = nil
 local AutoReloadThreshold = nil
 local function findAutoReload()
     while not LocalPlayer:FindFirstChild("Settings") do
-        wait(0.1)
+        wait(0)
     end
     
     local settingsFolder = LocalPlayer:FindFirstChild("Settings")
