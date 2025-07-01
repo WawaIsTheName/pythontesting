@@ -827,24 +827,18 @@ end)
 
 RunService.RenderStepped:Connect(function()
     if settings.enabled and settings.triggerOn and not manualShooting then
-        local hasEnemy = getEnemyUnderCrosshair() -- We only need the boolean return
+        local hasEnemy = getEnemyUnderCrosshair()
         
-        if hasEnemy then
-            if not holdingMouse then
-                mouse1press()
-                holdingMouse = true
-            end
-        else
-            if holdingMouse then
-                mouse1release()
-                holdingMouse = false
-            end
-        end
-    else
-        if holdingMouse then
+        if hasEnemy and not holdingMouse then
+            mouse1press()
+            holdingMouse = true
+        elseif not hasEnemy and holdingMouse then
             mouse1release()
             holdingMouse = false
         end
+    elseif holdingMouse then
+        mouse1release()
+        holdingMouse = false
     end
 end)
 
