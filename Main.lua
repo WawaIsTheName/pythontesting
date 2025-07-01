@@ -692,6 +692,8 @@ local lastTargetTime = 0
 local spreadControlHolding = false
 local holdingMouse = false
 local lastTargetCheck = 0
+local lastShotTime = 0
+local lastTargetTime = 0
 local targetDetected = false
 
 local function isManuallyShooting()
@@ -716,7 +718,7 @@ local function isEnemyUnderCrosshair()
     local viewportSize = camera.ViewportSize
     
     -- Get the center of the screen
-    local screenCenter = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
+    local screenCenter = Vector2.new(viewportSize.X/2, viewportSize.Y/2)
     
     -- Create a ray from the camera through the center of the screen
     local ray = camera:ViewportPointToRay(screenCenter.X, screenCenter.Y)
@@ -794,7 +796,6 @@ local function handleShooting()
         if holdingMouse then
             mouse1release()
             holdingMouse = false
-            targetDetected = false
         end
         return
     else
@@ -805,45 +806,36 @@ local function handleShooting()
         if holdingMouse then
             mouse1release()
             holdingMouse = false
-            targetDetected = false
         end
         return
     end
 
-    -- Only check for targets at the specified interval
-    if (currentTime - lastTargetCheck) >= settings.raycastInterval then
-        targetDetected = isEnemyUnderCrosshair()
-        lastTargetCheck = currentTime
-    end
+    -- Check for targets every frame for maximum responsiveness
+    targetDetected = isEnemyUnderCrosshair()
 
     if targetDetected then
         -- First shot delay handling
-        if settings.firstShotDelay > 0 and not settings.waitingForFirstShot and not holdingMouse then
-            settings.targetDetectedTime = currentTime
-            settings.waitingForFirstShot = true
-            return
-        end
-
-        if settings.waitingForFirstShot then
-            if (currentTime - settings.targetDetectedTime) >= settings.firstShotDelay then
-                settings.waitingForFirstShot = false
-            else
-                return
-            end
-        end
-
-        -- Regular shooting with delay
-        if not holdingMouse or (settings.shootDelay > 0 and (currentTime - settings.lastShotTime) >= settings.shootDelay) then
-            if not holdingMouse then
+        if settings.firstShotDelay > 0 and not holdingMouse then
+            if lastTargetTime == 0 then
+                lastTargetTime = currentTime
+            elseif (currentTime - lastTargetTime) >= settings.firstShotDelay then
                 mouse1press()
                 holdingMouse = true
+                lastShotTime = currentTime
             end
-            settings.lastShotTime = currentTime
+        else
+            -- Regular shooting with delay
+            if not holdingMouse or (settings.shootDelay > 0 and (currentTime - lastShotTime) >= settings.shootDelay) then
+                if not holdingMouse then
+                    mouse1press()
+                    holdingMouse = true
+                end
+                lastShotTime = currentTime
+            end
         end
     else
         -- No target found
-        settings.waitingForFirstShot = false
-        
+        lastTargetTime = 0
         if holdingMouse then
             mouse1release()
             holdingMouse = false
