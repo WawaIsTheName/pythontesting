@@ -13,7 +13,7 @@ local AutoReload = nil
 local AutoReloadThreshold = nil
 local function findAutoReload()
     while not LocalPlayer:FindFirstChild("Settings") do
-        wait(0)
+        wait(0.1)
     end
     
     local settingsFolder = LocalPlayer:FindFirstChild("Settings")
@@ -710,33 +710,51 @@ local function isEnemy(player, character)
 end
 
 local function getEnemyUnderCrosshair()
-    local camera = workspace.CurrentCamera
-    if not camera then return false, nil, nil, nil end
-    
-    local origin = camera.CFrame.Position
-    local direction = (Mouse.Hit.Position - origin).Unit * 1000
+	local camera = workspace.CurrentCamera
+	local origin = camera.CFrame.Position
 
-    local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character or workspace}
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    rayParams.IgnoreWater = true
-    
-    -- Improved filtering
-    rayParams:AddToFilter(workspace.Terrain)
-    if workspace:FindFirstChild("Effects") then rayParams:AddToFilter(workspace.Effects) end
-    if workspace:FindFirstChild("Particles") then rayParams:AddToFilter(workspace.Particles) end
+	if not Mouse.Hit or typeof(Mouse.Hit.Position) ~= "Vector3" then
+		return false
+	end
 
-    local result = workspace:Raycast(origin, direction, rayParams)
+	local direction = (Mouse.Hit.Position - origin).Unit * 1000
 
-    if result and result.Instance then
-        local character = result.Instance:FindFirstAncestorOfClass("Model")
-        local player = Players:GetPlayerFromCharacter(character)
-        if isEnemy(player, character) then
-            return true, result.Position, (result.Position - origin).Magnitude, character
-        end
-    end
+	local rayParams = RaycastParams.new()
+	rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+	rayParams.IgnoreWater = true
 
-    return false, nil, nil, nil
+	local maxIterations = 20
+	local iterations = 0
+
+	local result = workspace:Raycast(origin, direction, rayParams)
+
+	-- Skip invisible or transparent parts and allow skipping unions with holes
+	while result and result.Instance and iterations < maxIterations do
+		local inst = result.Instance
+
+		local isTransparent = inst.Transparency > 0.05
+
+		local isEmptyUnion = inst:IsA("UnionOperation") and inst.CollisionFidelity == Enum.CollisionFidelity.Box and inst:IsDescendantOf(workspace)
+
+		if isTransparent or isEmptyUnion then
+			table.insert(rayParams.FilterDescendantsInstances, inst)
+			iterations += 1
+			result = workspace:Raycast(origin, direction, rayParams)
+		else
+			break
+		end
+	end
+
+	if result and result.Instance then
+		local character = result.Instance:FindFirstAncestorOfClass("Model")
+		local player = Players:GetPlayerFromCharacter(character)
+		if isEnemy(player, character) then
+			return true
+		end
+	end
+
+	return false
 end
 
 local function getTargetVelocity(character)
