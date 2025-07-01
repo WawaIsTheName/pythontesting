@@ -23,6 +23,7 @@ local function mouse1release()
     else
         VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, false, game, 1)
     end
+end 
 
 -- Settings
 local settings = {
