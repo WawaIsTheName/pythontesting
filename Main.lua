@@ -3,9 +3,35 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
+
+-- Try to find AutoReload variable in the game
+local AutoReload = nil
+local function findAutoReload()
+    -- Check in ReplicatedFirst
+    if ReplicatedStorage:FindFirstChild("AutoReload") then
+        return ReplicatedStorage.AutoReload
+    end
+    
+    -- Check in ReplicatedStorage
+    if ReplicatedStorage:FindFirstChild("AutoReload") then
+        return ReplicatedStorage.AutoReload
+    end
+    
+    -- Check in other common places
+    for _, service in pairs({workspace, game:GetService("StarterPack"), game:GetService("StarterGui")}) do
+        if service:FindFirstChild("AutoReload") then
+            return service.AutoReload
+        end
+    end
+    
+    return nil
+end
+
+AutoReload = findAutoReload()
 
 local function mouse1press()
     local vim = game:GetService("VirtualInputManager")
@@ -51,7 +77,9 @@ local settings = {
     projectileFireDelay = 0,
     lastRaycastTime = 0,
     raycastInterval = 0.02,
-    lastTargetCheck = 0
+    lastTargetCheck = 0,
+    autoReloadEnabled = false,
+    waitingForFirstShot = false
 }
 
 -- UI Creation
@@ -61,8 +89,8 @@ screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 370, 0, 380) -- Increased height for new elements
-mainFrame.Position = UDim2.new(0.5, -185, 0.5, -190) -- Adjusted position
+mainFrame.Size = UDim2.new(0, 370, 0, 410) -- Increased height for new elements
+mainFrame.Position = UDim2.new(0.5, -185, 0.5, -205) -- Adjusted position
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -400,11 +428,24 @@ projectileSpeedButton.BackgroundTransparency = 1
 projectileSpeedButton.Text = ""
 projectileSpeedButton.Parent = projectileSpeedSlider
 
+-- Auto Reload Toggle
+local autoReloadButton = Instance.new("TextButton")
+autoReloadButton.Name = "AutoReloadButton"
+autoReloadButton.Size = UDim2.new(0.9, 0, 0, 25)
+autoReloadButton.Position = UDim2.new(0.05, 0, 0, 325)
+autoReloadButton.BackgroundColor3 = settings.autoReloadEnabled and Color3.fromRGB(50, 120, 50) or Color3.fromRGB(120, 50, 50)
+autoReloadButton.BorderSizePixel = 0
+autoReloadButton.Text = settings.autoReloadEnabled and "Auto Reload: ON" or "Auto Reload: OFF"
+autoReloadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoReloadButton.Font = Enum.Font.Gotham
+autoReloadButton.TextSize = 12
+autoReloadButton.Parent = mainFrame
+
 -- Added warning label
 local warningLabel = Instance.new("TextLabel")
 warningLabel.Name = "WarningLabel"
 warningLabel.Size = UDim2.new(1, -20, 0, 20)
-warningLabel.Position = UDim2.new(0, 10, 0, 325)
+warningLabel.Position = UDim2.new(0, 10, 0, 355)
 warningLabel.BackgroundTransparency = 1
 warningLabel.Text = "Trigger Bot may not detect some players due to part hitboxes"
 warningLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -416,7 +457,7 @@ warningLabel.Parent = mainFrame
 local keybindLabel = Instance.new("TextLabel")
 keybindLabel.Name = "KeybindLabel"
 keybindLabel.Size = UDim2.new(1, -20, 0, 20)
-keybindLabel.Position = UDim2.new(0, 10, 0, 345)
+keybindLabel.Position = UDim2.new(0, 10, 0, 375)
 keybindLabel.BackgroundTransparency = 1
 keybindLabel.Text = "GUI: Home | Trigger: T | Spread: V | Predict: P"
 keybindLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -465,6 +506,9 @@ local function updateUI()
     projectileSpeedSlider.Visible = settings.projectilePredictionEnabled
     projectileSpeedTitle.Text = "Projectile Speed: " .. settings.projectileSpeed .. " studs/s"
     projectileSpeedFill.Size = UDim2.new(settings.projectileSpeed / 5000, 0, 1, 0)
+    
+    autoReloadButton.Text = settings.autoReloadEnabled and "Auto Reload: ON" or "Auto Reload: OFF"
+    autoReloadButton.BackgroundColor3 = settings.autoReloadEnabled and Color3.fromRGB(50, 120, 50) or Color3.fromRGB(120, 50, 50)
 end
 
 local function toggleUI()
@@ -475,7 +519,7 @@ local function toggleUI()
         local tween = TweenService:Create(
             mainFrame,
             TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {Size = UDim2.new(0, 370, 0, 380)}
+            {Size = UDim2.new(0, 370, 0, 410)}
         )
         tween:Play()
     end
@@ -499,6 +543,14 @@ end)
 
 predictionButton.MouseButton1Click:Connect(function()
     settings.projectilePredictionEnabled = not settings.projectilePredictionEnabled
+    updateUI()
+end)
+
+autoReloadButton.MouseButton1Click:Connect(function()
+    settings.autoReloadEnabled = not settings.autoReloadEnabled
+    if AutoReload then
+        AutoReload.Value = settings.autoReloadEnabled
+    end
     updateUI()
 end)
 
@@ -723,12 +775,10 @@ local function getTargetVelocity(character)
     return Vector3.new(0, 0, 0)
 end
 
-local function predictPosition(targetPosition, targetVelocity, projectileSpeed)
-    local camera = workspace.CurrentCamera
-    local origin = camera.CFrame.Position
-    local distance = (targetPosition - origin).Magnitude
-    local timeToTarget = distance / projectileSpeed
+local function predictPosition(targetPosition, targetVelocity, projectileSpeed, distance)
+    if not projectileSpeed or projectileSpeed <= 0 then return targetPosition end
     
+    local timeToTarget = distance / projectileSpeed
     -- Simple prediction: assume target continues at current velocity
     return targetPosition + (targetVelocity * timeToTarget)
 end
@@ -738,6 +788,8 @@ local function handleShooting()
         if holdingMouse then
             mouse1release()
             holdingMouse = false
+            settings.waitingForFirstShot = false
+            settings.firstShotFired = false
         end
         return
     end
@@ -747,18 +799,41 @@ local function handleShooting()
 
     if hasEnemy then
         -- Apply projectile prediction if enabled
-        if settings.projectilePredictionEnabled and (currentTime - settings.lastProjectileFireTime) > settings.projectileFireDelay then
+        if settings.projectilePredictionEnabled then
             local targetVelocity = getTargetVelocity(enemyCharacter)
-            enemyPosition = predictPosition(enemyPosition, targetVelocity, settings.projectileSpeed)
-            settings.lastProjectileFireTime = currentTime
+            enemyPosition = predictPosition(enemyPosition, targetVelocity, settings.projectileSpeed, enemyDistance)
         end
-        
-        if not holdingMouse then
-            mouse1press()
-            holdingMouse = true
-            settings.lastShotTime = currentTime
+
+        -- Handle first shot delay
+        if not settings.firstShotFired and not settings.waitingForFirstShot then
+            settings.targetDetectedTime = currentTime
+            settings.waitingForFirstShot = true
+            return
+        end
+
+        -- Check if we're still waiting for first shot delay
+        if settings.waitingForFirstShot then
+            if (currentTime - settings.targetDetectedTime) >= settings.firstShotDelay then
+                settings.waitingForFirstShot = false
+                settings.firstShotFired = true
+            else
+                return -- Still waiting for first shot delay
+            end
+        end
+
+        -- Check regular shot delay
+        if (currentTime - settings.lastShotTime) >= settings.shootDelay then
+            if not holdingMouse then
+                mouse1press()
+                holdingMouse = true
+                settings.lastShotTime = currentTime
+            end
         end
     else
+        -- Reset first shot tracking when no target
+        settings.waitingForFirstShot = false
+        settings.firstShotFired = false
+        
         if holdingMouse then
             mouse1release()
             holdingMouse = false
@@ -766,6 +841,18 @@ local function handleShooting()
     end
 end
 
+-- Main loop
+RunService.RenderStepped:Connect(function()
+    -- Handle auto-reload if enabled
+    if settings.autoReloadEnabled and AutoReload then
+        AutoReload.Value = true
+    end
+    
+    -- Handle shooting logic
+    handleShooting()
+end)
+
+-- Keybind handling
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
@@ -783,22 +870,10 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-RunService.RenderStepped:Connect(function()
-    if settings.enabled and settings.triggerOn and not manualShooting then
-        local hasEnemy = getEnemyUnderCrosshair()
-        
-        if hasEnemy and not holdingMouse then
-            mouse1press()
-            holdingMouse = true
-        elseif not hasEnemy and holdingMouse then
-            mouse1release()
-            holdingMouse = false
-        end
-    elseif holdingMouse then
-        mouse1release()
-        holdingMouse = false
-    end
-end)
+-- Initialize AutoReload if found
+if AutoReload then
+    AutoReload.Value = settings.autoReloadEnabled
+end
 
 -- Initial UI update
 updateUI()
