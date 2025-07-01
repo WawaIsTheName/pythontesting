@@ -28,7 +28,7 @@ local settings = {
     projectilePredictionKey = Enum.KeyCode.P,
     projectileSpeed = 1000,
     lastProjectileFireTime = 0,
-    projectileFireDelay = 0.1
+    projectileFireDelay = 0
 }
 
 -- UI Creation
