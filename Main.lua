@@ -509,12 +509,19 @@ end
 local function toggleUI()
     mainFrame.Visible = not mainFrame.Visible
     if mainFrame.Visible then
-        mainFrame.Size = UDim2.new(0, 0, 0, 0)
+        mainFrame.Size = UDim2.new(0, 370, 0, 0) -- Start with width but no height
         mainFrame.Position = lastPosition
         local tween = TweenService:Create(
             mainFrame,
             TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
             {Size = UDim2.new(0, 370, 0, 410)}
+        )
+        tween:Play()
+    else
+        local tween = TweenService:Create(
+            mainFrame,
+            TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            {Size = UDim2.new(0, 370, 0, 0)}
         )
         tween:Play()
     end
