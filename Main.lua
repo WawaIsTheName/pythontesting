@@ -8,12 +8,21 @@ local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
 local function mouse1press()
-    VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, true, game, 1)
+    if not VirtualInputManager then
+        -- Fallback to old method if VirtualInputManager isn't available
+        mouse1click()
+    else
+        VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, true, game, 1)
+    end
 end
 
 local function mouse1release()
-    VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, false, game, 1)
-end
+    if not VirtualInputManager then
+        -- Fallback to old method if VirtualInputManager isn't available
+        mouse1release()
+    else
+        VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, false, game, 1)
+    end
 
 -- Settings
 local settings = {
@@ -631,15 +640,15 @@ local spreadControlHolding = false
 local function isEnemy(player, character)
     if not player or not character then return false end
     if player == LocalPlayer then return false end
-
+    
+    -- Handle cases where teams might not exist
+    local teamCheckPassed = true
     if LocalPlayer.Team and player.Team then
-        if LocalPlayer.Team == player.Team then
-            return false
-        end
+        teamCheckPassed = LocalPlayer.Team ~= player.Team
     end
     
     local humanoid = character:FindFirstChildOfClass("Humanoid")
-    return humanoid and humanoid.Health > 0
+    return teamCheckPassed and humanoid and humanoid.Health > 0
 end
 
 local function getEnemyUnderCrosshair()
