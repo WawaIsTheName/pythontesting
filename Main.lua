@@ -7,6 +7,14 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
+local function mouse1press()
+    VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, true, game, 1)
+end
+
+local function mouse1release()
+    VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, false, game, 1)
+end
+
 -- Settings
 local settings = {
     enabled = false,
@@ -621,20 +629,28 @@ local lastTargetTime = 0
 local spreadControlHolding = false
 
 local function isEnemy(player, character)
-    if player and player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and character then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        return humanoid and humanoid.Health > 0
+    if not player or not character then return false end
+    if player == LocalPlayer then return false end
+
+    if LocalPlayer.Team and player.Team then
+        if LocalPlayer.Team == player.Team then
+            return false
+        end
     end
-    return false
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.Health > 0
 end
 
 local function getEnemyUnderCrosshair()
     local camera = workspace.CurrentCamera
+    if not camera then return false, nil, nil, nil end
+    
     local origin = camera.CFrame.Position
     local direction = (Mouse.Hit.Position - origin).Unit * 1000
 
     local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character or workspace}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
     rayParams.IgnoreWater = true
 
