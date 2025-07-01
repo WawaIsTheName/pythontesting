@@ -9,20 +9,21 @@ local Mouse = LocalPlayer:GetMouse()
 
 -- Settings
 local settings = {
-    enabled = true, -- Enabled by default
-    triggerOn = true, -- Automatically turn on when script starts
+    enabled = true,
+    triggerOn = true,
     toggleKey = Enum.KeyCode.Home,
     triggerToggleKey = Enum.KeyCode.T,
-    shootDelay = 0, -- Default delay between shots in seconds
-    firstShotDelay = 0.02, -- Changed to 0.02 as requested
+    shootDelay = 0,
+    firstShotDelay = 0.02,
     lastShotTime = 0,
     targetDetectedTime = 0,
     hasTarget = false,
-    spreadControlEnabled = false, -- New spread control feature
-    spreadControlToggleKey = Enum.KeyCode.B, -- Changed to B
+    spreadControlEnabled = false,
+    spreadControlToggleKey = Enum.KeyCode.B,
     lastSpreadShotTime = 0,
-    spreadShotInterval = 0, -- Time between spread control shots
-    maxSpreadDistance = 5 -- Maximum distance from crosshair to consider for spread control
+    spreadShotInterval = 0, -- Changed to 0 (no delay)
+    maxSpreadDistance = 5,
+    firstShotFired = false -- Added to track first shot
 }
 
 -- UI Creation
@@ -32,7 +33,7 @@ screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 370, 0, 320) -- Increased height for new sliders
+mainFrame.Size = UDim2.new(0, 370, 0, 320)
 mainFrame.Position = UDim2.new(0.5, -185, 0.5, -160)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -53,7 +54,7 @@ local function updateInput(input)
     local delta = input.Position - dragStart
     local newPosition = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     mainFrame.Position = newPosition
-    lastPosition = newPosition -- Update last position when dragging
+    lastPosition = newPosition
 end
 
 mainFrame.InputBegan:Connect(function(input)
@@ -126,7 +127,7 @@ spreadControlButton.Size = UDim2.new(0.9, 0, 0, 25)
 spreadControlButton.Position = UDim2.new(0.05, 0, 0, 90)
 spreadControlButton.BackgroundColor3 = settings.spreadControlEnabled and Color3.fromRGB(50, 120, 50) or Color3.fromRGB(120, 50, 50)
 spreadControlButton.BorderSizePixel = 0
-spreadControlButton.Text = settings.spreadControlEnabled and "Spread Control: ON (B)" or "Spread Control: OFF (B)" -- Changed to B
+spreadControlButton.Text = settings.spreadControlEnabled and "Spread Control: ON (B)" or "Spread Control: OFF (B)"
 spreadControlButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 spreadControlButton.Font = Enum.Font.Gotham
 spreadControlButton.TextSize = 12
@@ -163,9 +164,9 @@ firstDelayBar.Parent = firstDelaySlider
 
 local firstDelayFill = Instance.new("Frame")
 firstDelayFill.Name = "FirstDelayFill"
-firstDelayFill.Size = UDim2.new(0.02, 0, 1, 0) -- Set to 0.02 by default
+firstDelayFill.Size = UDim2.new(0.02, 0, 1, 0)
 firstDelayFill.Position = UDim2.new(0, 0, 0, 0)
-firstDelayFill.BackgroundColor3 = Color3.fromRGB(255, 150, 0) -- Orange color for first shot delay
+firstDelayFill.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
 firstDelayFill.BorderSizePixel = 0
 firstDelayFill.Parent = firstDelayBar
 
@@ -210,7 +211,7 @@ local delayFill = Instance.new("Frame")
 delayFill.Name = "DelayFill"
 delayFill.Size = UDim2.new(0, 0, 1, 0)
 delayFill.Position = UDim2.new(0, 0, 0, 0)
-delayFill.BackgroundColor3 = Color3.fromRGB(0, 150, 255) -- Blue color for regular delay
+delayFill.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 delayFill.BorderSizePixel = 0
 delayFill.Parent = delayBar
 
@@ -253,9 +254,9 @@ spreadIntervalBar.Parent = spreadIntervalSlider
 
 local spreadIntervalFill = Instance.new("Frame")
 spreadIntervalFill.Name = "SpreadIntervalFill"
-spreadIntervalFill.Size = UDim2.new(settings.spreadShotInterval / 0.5, 0, 1, 0) -- Max 0.5 seconds
+spreadIntervalFill.Size = UDim2.new(0, 0, 1, 0)
 spreadIntervalFill.Position = UDim2.new(0, 0, 0, 0)
-spreadIntervalFill.BackgroundColor3 = Color3.fromRGB(150, 0, 255) -- Purple color
+spreadIntervalFill.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
 spreadIntervalFill.BorderSizePixel = 0
 spreadIntervalFill.Parent = spreadIntervalBar
 
@@ -267,7 +268,7 @@ spreadIntervalButton.BackgroundTransparency = 1
 spreadIntervalButton.Text = ""
 spreadIntervalButton.Parent = spreadIntervalSlider
 
--- Max Spread Distance slider
+-- Max Spread Distance slider (updated to 100px max)
 local spreadDistanceSlider = Instance.new("Frame")
 spreadDistanceSlider.Name = "SpreadDistanceSlider"
 spreadDistanceSlider.Size = UDim2.new(0.9, 0, 0, 30)
@@ -298,9 +299,9 @@ spreadDistanceBar.Parent = spreadDistanceSlider
 
 local spreadDistanceFill = Instance.new("Frame")
 spreadDistanceFill.Name = "SpreadDistanceFill"
-spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 20, 0, 1, 0) -- Max 20px
+spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 100, 0, 1, 0) -- Changed to 100px max
 spreadDistanceFill.Position = UDim2.new(0, 0, 0, 0)
-spreadDistanceFill.BackgroundColor3 = Color3.fromRGB(255, 0, 150) -- Pink color
+spreadDistanceFill.BackgroundColor3 = Color3.fromRGB(255, 0, 150)
 spreadDistanceFill.BorderSizePixel = 0
 spreadDistanceFill.Parent = spreadDistanceBar
 
@@ -345,7 +346,6 @@ local function updateUI()
     else
         toggleButton.Text = "Enable Triggerbot"
         toggleButton.BackgroundColor3 = Color3.fromRGB(120, 50, 50)
-        -- When disabling via button, also turn off trigger
         if settings.triggerOn then
             settings.triggerOn = false
             if holdingMouse then
@@ -364,23 +364,19 @@ local function updateUI()
     delayTitle.Text = "Shot Delay: " .. string.format("%.2f", settings.shootDelay) .. "s"
     delayFill.Size = UDim2.new(settings.shootDelay, 0, 1, 0)
     
-    -- Update spread control button
     spreadControlButton.Text = settings.spreadControlEnabled and "Spread Control: ON (B)" or "Spread Control: OFF (B)"
     spreadControlButton.BackgroundColor3 = settings.spreadControlEnabled and Color3.fromRGB(50, 120, 50) or Color3.fromRGB(120, 50, 50)
     
-    -- Update spread interval slider
     spreadIntervalTitle.Text = "Spread Interval: " .. string.format("%.1f", settings.spreadShotInterval) .. "s"
-    spreadIntervalFill.Size = UDim2.new(settings.spreadShotInterval / 0.5, 0, 1, 0) -- Max 0.5 seconds
+    spreadIntervalFill.Size = UDim2.new(settings.spreadShotInterval / 0.5, 0, 1, 0)
     
-    -- Update spread distance slider
     spreadDistanceTitle.Text = "Max Spread: " .. string.format("%.0f", settings.maxSpreadDistance) .. "px"
-    spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 20, 0, 1, 0) -- Max 20px
+    spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 100, 0, 1, 0) -- Updated to 100px max
 end
 
 local function toggleUI()
     mainFrame.Visible = not mainFrame.Visible
     if mainFrame.Visible then
-        -- Use last position instead of resetting to center
         mainFrame.Size = UDim2.new(0, 0, 0, 0)
         mainFrame.Position = lastPosition
         local tween = TweenService:Create(
@@ -418,10 +414,10 @@ local function updateSlider(input, sliderType)
         maxValue = 1
     elseif sliderType == "spreadInterval" then
         bar = spreadIntervalBar
-        maxValue = 0.5 -- Max 0.5 seconds
+        maxValue = 0.5
     elseif sliderType == "spreadDistance" then
         bar = spreadDistanceBar
-        maxValue = 20 -- Max 20px
+        maxValue = 100 -- Updated to 100px max
     end
     
     local relativeX = input.Position.X - bar.AbsolutePosition.X
@@ -527,15 +523,13 @@ local spreadControlHolding = false
 
 UserInputService.InputBegan:Connect(function(input, isProcessed)
     if not isProcessed then
-        -- Toggle UI
         if input.KeyCode == settings.toggleKey then
             toggleUI()
         end
         
-        -- Toggle triggerbot on/off when enabled
         if settings.enabled and input.KeyCode == settings.triggerToggleKey then
             settings.triggerOn = not settings.triggerOn
-            settings.hasTarget = false -- Reset target detection when toggling
+            settings.hasTarget = false
             updateUI()
             if not settings.triggerOn and holdingMouse then
                 mouse1release()
@@ -543,7 +537,6 @@ UserInputService.InputBegan:Connect(function(input, isProcessed)
             end
         end
         
-        -- Toggle spread control
         if settings.enabled and input.KeyCode == settings.spreadControlToggleKey then
             settings.spreadControlEnabled = not settings.spreadControlEnabled
             updateUI()
@@ -552,6 +545,7 @@ UserInputService.InputBegan:Connect(function(input, isProcessed)
 
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         manualShooting = true
+        settings.firstShotFired = false -- Reset first shot flag when manually shooting
     end
 end)
 
@@ -626,11 +620,8 @@ end
 
 local function shouldUseSpreadControl(currentTime, targetPosition, targetDistance)
     if not settings.spreadControlEnabled then return false end
-    
-    -- If we don't have previous target data, don't use spread control
     if not lastTargetPosition or not lastTargetDistance then return false end
     
-    -- Calculate how much the target has moved relative to crosshair
     local camera = workspace.CurrentCamera
     local screenPos1 = camera:WorldToScreenPoint(lastTargetPosition)
     local screenPos2 = camera:WorldToScreenPoint(targetPosition)
@@ -639,12 +630,10 @@ local function shouldUseSpreadControl(currentTime, targetPosition, targetDistanc
     local distFromCrosshair1 = (Vector2.new(screenPos1.X, screenPos1.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
     local distFromCrosshair2 = (Vector2.new(screenPos2.X, screenPos2.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
     
-    -- If target is moving away from crosshair or is outside our max spread distance
     if (distFromCrosshair2 > distFromCrosshair1 and distFromCrosshair2 > 5) or distFromCrosshair2 > settings.maxSpreadDistance then
         return true
     end
     
-    -- If it's been a while since we last shot (to maintain spread)
     if (currentTime - lastTargetTime) > 0.5 then
         return true
     end
@@ -660,17 +649,17 @@ RunService.RenderStepped:Connect(function()
         
         if hasEnemy then
             if not settings.hasTarget then
-                -- First time detecting target
                 settings.hasTarget = true
                 settings.targetDetectedTime = currentTime
+                settings.firstShotFired = false -- Reset first shot flag when new target detected
             end
             
-            -- Check if first shot delay has passed
+            -- First shot delay logic
             local firstDelayPassed = (currentTime - settings.targetDetectedTime) >= settings.firstShotDelay
-            -- Check if regular delay has passed since last shot
             local regularDelayPassed = (currentTime - settings.lastShotTime) >= settings.shootDelay
             
-            if firstDelayPassed and regularDelayPassed then
+            -- Only shoot if first delay has passed or it's not the first shot
+            if (firstDelayPassed or settings.firstShotFired) and regularDelayPassed then
                 if not holdingMouse then
                     mouse1press()
                     holdingMouse = true
@@ -679,9 +668,10 @@ RunService.RenderStepped:Connect(function()
                 lastTargetTime = currentTime
                 lastTargetPosition = enemyPosition
                 lastTargetDistance = enemyDistance
+                settings.firstShotFired = true -- Mark first shot as fired
             end
             
-            -- Spread control logic
+            -- Spread control logic (now with 0 delay by default)
             if settings.spreadControlEnabled and (currentTime - settings.lastSpreadShotTime) >= settings.spreadShotInterval then
                 if shouldUseSpreadControl(currentTime, enemyPosition, enemyDistance) then
                     if not spreadControlHolding then
@@ -698,7 +688,6 @@ RunService.RenderStepped:Connect(function()
                 holdingMouse = false
             end
             
-            -- Release spread control if no target
             if spreadControlHolding then
                 mouse1release()
                 spreadControlHolding = false
@@ -711,7 +700,6 @@ RunService.RenderStepped:Connect(function()
             holdingMouse = false
         end
         
-        -- Release spread control if triggerbot is off
         if spreadControlHolding then
             mouse1release()
             spreadControlHolding = false
