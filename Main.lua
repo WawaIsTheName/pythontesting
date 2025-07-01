@@ -22,8 +22,13 @@ local settings = {
     spreadControlToggleKey = Enum.KeyCode.V,
     lastSpreadShotTime = 0,
     spreadShotInterval = 0,
-    maxSpreadDistance = 200, -- Increased to 100px
-    firstShotFired = false
+    maxSpreadDistance = 25,
+    firstShotFired = false,
+    projectilePredictionEnabled = false,
+    projectilePredictionKey = Enum.KeyCode.P,
+    projectileSpeed = 1000,
+    lastProjectileFireTime = 0,
+    projectileFireDelay = 0.1
 }
 
 -- UI Creation
@@ -33,8 +38,8 @@ screenGui.Parent = CoreGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 370, 0, 320)
-mainFrame.Position = UDim2.new(0.5, -185, 0.5, -160)
+mainFrame.Size = UDim2.new(0, 370, 0, 380) -- Increased height for new elements
+mainFrame.Position = UDim2.new(0.5, -185, 0.5, -190) -- Adjusted position
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
@@ -268,7 +273,7 @@ spreadIntervalButton.BackgroundTransparency = 1
 spreadIntervalButton.Text = ""
 spreadIntervalButton.Parent = spreadIntervalSlider
 
--- Max Spread Distance slider (updated to 100px max)
+-- Max Spread Distance slider
 local spreadDistanceSlider = Instance.new("Frame")
 spreadDistanceSlider.Name = "SpreadDistanceSlider"
 spreadDistanceSlider.Size = UDim2.new(0.9, 0, 0, 30)
@@ -299,7 +304,7 @@ spreadDistanceBar.Parent = spreadDistanceSlider
 
 local spreadDistanceFill = Instance.new("Frame")
 spreadDistanceFill.Name = "SpreadDistanceFill"
-spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 200, 0, 1, 0) -- Changed to 100px max
+spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 200, 0, 1, 0)
 spreadDistanceFill.Position = UDim2.new(0, 0, 0, 0)
 spreadDistanceFill.BackgroundColor3 = Color3.fromRGB(255, 0, 150)
 spreadDistanceFill.BorderSizePixel = 0
@@ -313,11 +318,70 @@ spreadDistanceButton.BackgroundTransparency = 1
 spreadDistanceButton.Text = ""
 spreadDistanceButton.Parent = spreadDistanceSlider
 
+-- Projectile Prediction Toggle
+local predictionButton = Instance.new("TextButton")
+predictionButton.Name = "PredictionButton"
+predictionButton.Size = UDim2.new(0.9, 0, 0, 25)
+predictionButton.Position = UDim2.new(0.05, 0, 0, 260)
+predictionButton.BackgroundColor3 = settings.projectilePredictionEnabled and Color3.fromRGB(50, 120, 50) or Color3.fromRGB(120, 50, 50)
+predictionButton.BorderSizePixel = 0
+predictionButton.Text = settings.projectilePredictionEnabled and "Projectile Prediction: ON (P)" or "Projectile Prediction: OFF (P)"
+predictionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+predictionButton.Font = Enum.Font.Gotham
+predictionButton.TextSize = 12
+predictionButton.Parent = mainFrame
+
+-- Projectile Speed slider
+local projectileSpeedSlider = Instance.new("Frame")
+projectileSpeedSlider.Name = "ProjectileSpeedSlider"
+projectileSpeedSlider.Size = UDim2.new(0.9, 0, 0, 30)
+projectileSpeedSlider.Position = UDim2.new(0.05, 0, 0, 290)
+projectileSpeedSlider.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+projectileSpeedSlider.BorderSizePixel = 0
+projectileSpeedSlider.Visible = settings.projectilePredictionEnabled
+projectileSpeedSlider.Parent = mainFrame
+
+local projectileSpeedTitle = Instance.new("TextLabel")
+projectileSpeedTitle.Name = "ProjectileSpeedTitle"
+projectileSpeedTitle.Size = UDim2.new(1, 0, 0.5, 0)
+projectileSpeedTitle.Position = UDim2.new(0, 0, 0, 0)
+projectileSpeedTitle.BackgroundTransparency = 1
+projectileSpeedTitle.Text = "Projectile Speed: " .. settings.projectileSpeed .. " studs/s"
+projectileSpeedTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+projectileSpeedTitle.Font = Enum.Font.Gotham
+projectileSpeedTitle.TextSize = 12
+projectileSpeedTitle.TextXAlignment = Enum.TextXAlignment.Left
+projectileSpeedTitle.Parent = projectileSpeedSlider
+
+local projectileSpeedBar = Instance.new("Frame")
+projectileSpeedBar.Name = "ProjectileSpeedBar"
+projectileSpeedBar.Size = UDim2.new(1, 0, 0, 5)
+projectileSpeedBar.Position = UDim2.new(0, 0, 0.5, 5)
+projectileSpeedBar.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+projectileSpeedBar.BorderSizePixel = 0
+projectileSpeedBar.Parent = projectileSpeedSlider
+
+local projectileSpeedFill = Instance.new("Frame")
+projectileSpeedFill.Name = "ProjectileSpeedFill"
+projectileSpeedFill.Size = UDim2.new(settings.projectileSpeed / 5000, 0, 1, 0)
+projectileSpeedFill.Position = UDim2.new(0, 0, 0, 0)
+projectileSpeedFill.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
+projectileSpeedFill.BorderSizePixel = 0
+projectileSpeedFill.Parent = projectileSpeedBar
+
+local projectileSpeedButton = Instance.new("TextButton")
+projectileSpeedButton.Name = "ProjectileSpeedButton"
+projectileSpeedButton.Size = UDim2.new(1, 0, 0.5, 0)
+projectileSpeedButton.Position = UDim2.new(0, 0, 0.5, 5)
+projectileSpeedButton.BackgroundTransparency = 1
+projectileSpeedButton.Text = ""
+projectileSpeedButton.Parent = projectileSpeedSlider
+
 -- Added warning label
 local warningLabel = Instance.new("TextLabel")
 warningLabel.Name = "WarningLabel"
 warningLabel.Size = UDim2.new(1, -20, 0, 20)
-warningLabel.Position = UDim2.new(0, 10, 0, 260)
+warningLabel.Position = UDim2.new(0, 10, 0, 325)
 warningLabel.BackgroundTransparency = 1
 warningLabel.Text = "Trigger Bot may not detect some players due to part hitboxes"
 warningLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -329,9 +393,9 @@ warningLabel.Parent = mainFrame
 local keybindLabel = Instance.new("TextLabel")
 keybindLabel.Name = "KeybindLabel"
 keybindLabel.Size = UDim2.new(1, -20, 0, 20)
-keybindLabel.Position = UDim2.new(0, 10, 0, 280)
+keybindLabel.Position = UDim2.new(0, 10, 0, 345)
 keybindLabel.BackgroundTransparency = 1
-keybindLabel.Text = "Toggle GUI: Home | Toggle TriggerBot: T | Spread Control: V"
+keybindLabel.Text = "GUI: Home | Trigger: T | Spread: V | Predict: P"
 keybindLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
 keybindLabel.Font = Enum.Font.Gotham
 keybindLabel.TextSize = 10
@@ -371,7 +435,13 @@ local function updateUI()
     spreadIntervalFill.Size = UDim2.new(settings.spreadShotInterval / 0.5, 0, 1, 0)
     
     spreadDistanceTitle.Text = "Max Spread: " .. string.format("%.0f", settings.maxSpreadDistance) .. "px"
-    spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 200, 0, 1, 0) -- Updated to 100px max
+    spreadDistanceFill.Size = UDim2.new(settings.maxSpreadDistance / 200, 0, 1, 0)
+    
+    predictionButton.Text = settings.projectilePredictionEnabled and "Projectile Prediction: ON (P)" or "Projectile Prediction: OFF (P)"
+    predictionButton.BackgroundColor3 = settings.projectilePredictionEnabled and Color3.fromRGB(50, 120, 50) or Color3.fromRGB(120, 50, 50)
+    projectileSpeedSlider.Visible = settings.projectilePredictionEnabled
+    projectileSpeedTitle.Text = "Projectile Speed: " .. settings.projectileSpeed .. " studs/s"
+    projectileSpeedFill.Size = UDim2.new(settings.projectileSpeed / 5000, 0, 1, 0)
 end
 
 local function toggleUI()
@@ -382,7 +452,7 @@ local function toggleUI()
         local tween = TweenService:Create(
             mainFrame,
             TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            {Size = UDim2.new(0, 370, 0, 320)}
+            {Size = UDim2.new(0, 370, 0, 380)}
         )
         tween:Play()
     end
@@ -404,6 +474,11 @@ spreadControlButton.MouseButton1Click:Connect(function()
     updateUI()
 end)
 
+predictionButton.MouseButton1Click:Connect(function()
+    settings.projectilePredictionEnabled = not settings.projectilePredictionEnabled
+    updateUI()
+end)
+
 local function updateSlider(input, sliderType)
     local bar, maxValue
     if sliderType == "firstDelay" then
@@ -417,7 +492,10 @@ local function updateSlider(input, sliderType)
         maxValue = 0.5
     elseif sliderType == "spreadDistance" then
         bar = spreadDistanceBar
-        maxValue = 200 -- Updated to 100px max
+        maxValue = 200
+    elseif sliderType == "projectileSpeed" then
+        bar = projectileSpeedBar
+        maxValue = 5000
     end
     
     local relativeX = input.Position.X - bar.AbsolutePosition.X
@@ -432,6 +510,8 @@ local function updateSlider(input, sliderType)
         settings.spreadShotInterval = value
     elseif sliderType == "spreadDistance" then
         settings.maxSpreadDistance = value
+    elseif sliderType == "projectileSpeed" then
+        settings.projectileSpeed = value
     end
     
     updateUI()
@@ -513,6 +593,25 @@ spreadDistanceButton.MouseButton1Down:Connect(function()
     end)
 end)
 
+projectileSpeedButton.MouseButton1Down:Connect(function()
+    updateSlider({Position = UserInputService:GetMouseLocation()}, "projectileSpeed")
+    
+    local connection
+    connection = UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input, "projectileSpeed")
+        end
+    end)
+    
+    local releaseConnection
+    releaseConnection = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            connection:Disconnect()
+            releaseConnection:Disconnect()
+        end
+    end)
+end)
+
 -- Triggerbot Logic
 local holdingMouse = false
 local manualShooting = false
@@ -568,11 +667,11 @@ local function getEnemyUnderCrosshair()
         local character = result.Instance:FindFirstAncestorOfClass("Model")
         local player = Players:GetPlayerFromCharacter(character)
         if isEnemy(player, character) then
-            return true, result.Position, (result.Position - origin).Magnitude
+            return true, result.Position, (result.Position - origin).Magnitude, character
         end
     end
 
-    return false, nil, nil
+    return false, nil, nil, nil
 end
 
 local function shouldUseSpreadControl(targetPosition)
@@ -586,8 +685,33 @@ local function shouldUseSpreadControl(targetPosition)
     return distFromCrosshair > settings.maxSpreadDistance
 end
 
-local function handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistance)
+local function getTargetVelocity(character)
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        return humanoidRootPart.Velocity
+    end
+    return Vector3.new(0, 0, 0)
+end
+
+local function predictPosition(targetPosition, targetVelocity, projectileSpeed)
+    local camera = workspace.CurrentCamera
+    local origin = camera.CFrame.Position
+    local distance = (targetPosition - origin).Magnitude
+    local timeToTarget = distance / projectileSpeed
+    
+    -- Simple prediction: assume target continues at current velocity
+    return targetPosition + (targetVelocity * timeToTarget)
+end
+
+local function handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistance, enemyCharacter)
     if hasEnemy then
+        -- Apply projectile prediction if enabled
+        if settings.projectilePredictionEnabled and (currentTime - settings.lastProjectileFireTime) > settings.projectileFireDelay then
+            local targetVelocity = getTargetVelocity(enemyCharacter)
+            enemyPosition = predictPosition(enemyPosition, targetVelocity, settings.projectileSpeed)
+            settings.lastProjectileFireTime = currentTime
+        end
+        
         if not settings.hasTarget then
             -- New target detected
             settings.hasTarget = true
@@ -596,23 +720,38 @@ local function handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistanc
             holdingMouse = false
         end
 
-        -- First shot delay check
-        local firstDelayPassed = (currentTime - settings.targetDetectedTime) >= settings.firstShotDelay
-        local regularDelayPassed = (currentTime - settings.lastShotTime) >= settings.shootDelay
-
-        -- Main triggerbot shooting logic
-        if (firstDelayPassed or settings.firstShotFired) and regularDelayPassed then
-            if not holdingMouse then
-                mouse1press()
-                holdingMouse = true
+        -- Calculate time since target was first detected
+        local timeSinceDetection = currentTime - settings.targetDetectedTime
+        
+        -- First shot delay check (only if we haven't fired the first shot yet)
+        if not settings.firstShotFired then
+            if timeSinceDetection >= settings.firstShotDelay then
+                -- First shot delay has passed - fire!
+                if not holdingMouse then
+                    mouse1press()
+                    holdingMouse = true
+                end
+                settings.lastShotTime = currentTime
+                settings.firstShotFired = true
+                lastTargetPosition = enemyPosition
+                lastTargetDistance = enemyDistance
             end
-            settings.lastShotTime = currentTime
-            settings.firstShotFired = true
-            lastTargetPosition = enemyPosition
-            lastTargetDistance = enemyDistance
+        else
+            -- Regular shooting after first shot
+            local regularDelayPassed = (currentTime - settings.lastShotTime) >= settings.shootDelay
+            
+            if regularDelayPassed then
+                if not holdingMouse then
+                    mouse1press()
+                    holdingMouse = true
+                end
+                settings.lastShotTime = currentTime
+                lastTargetPosition = enemyPosition
+                lastTargetDistance = enemyDistance
+            end
         end
 
-        -- Spread control logic - fires continuously when enabled and target is in range
+        -- Spread control logic (independent of first shot delay)
         if settings.spreadControlEnabled and shouldUseSpreadControl(enemyPosition) then
             if not spreadControlHolding then
                 mouse1press()
@@ -633,6 +772,7 @@ local function handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistanc
             spreadControlHolding = false
         end
         settings.hasTarget = false
+        settings.firstShotFired = false
     end
 end
 
@@ -647,6 +787,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     elseif input.KeyCode == settings.spreadControlToggleKey then
         settings.spreadControlEnabled = not settings.spreadControlEnabled
         updateUI()
+    elseif input.KeyCode == settings.projectilePredictionKey then
+        settings.projectilePredictionEnabled = not settings.projectilePredictionEnabled
+        updateUI()
     end
 end)
 
@@ -654,8 +797,8 @@ RunService.RenderStepped:Connect(function()
     local currentTime = tick()
     
     if settings.enabled and settings.triggerOn and not manualShooting then
-        local hasEnemy, enemyPosition, enemyDistance = getEnemyUnderCrosshair()
-        handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistance)
+        local hasEnemy, enemyPosition, enemyDistance, enemyCharacter = getEnemyUnderCrosshair()
+        handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistance, enemyCharacter)
     else
         if holdingMouse then
             mouse1release()
