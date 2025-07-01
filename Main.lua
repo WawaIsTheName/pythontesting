@@ -814,17 +814,23 @@ RunService.RenderStepped:Connect(function()
     
     if settings.enabled and settings.triggerOn and not manualShooting then
         local hasEnemy, enemyPosition, enemyDistance, enemyCharacter = getEnemyUnderCrosshair()
-        handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistance, enemyCharacter)
+        
+        if hasEnemy then
+            if not holdingMouse then
+                mouse1press()
+                holdingMouse = true
+            end
+        else
+            if holdingMouse then
+                mouse1release()
+                holdingMouse = false
+            end
+        end
     else
         if holdingMouse then
             mouse1release()
             holdingMouse = false
         end
-        if spreadControlHolding then
-            mouse1release()
-            spreadControlHolding = false
-        end
-        settings.hasTarget = false
     end
 end)
 
