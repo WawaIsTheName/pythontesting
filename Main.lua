@@ -711,13 +711,13 @@ end
 
 local function isEnemyUnderCrosshair()
     local camera = workspace.CurrentCamera
-    local origin = camera.CFrame.Position
-
-    if not Mouse.Hit or typeof(Mouse.Hit.Position) ~= "Vector3" then
-        return false
-    end
-
-    local direction = (Mouse.Hit.Position - origin).Unit * 1000
+    local viewportSize = camera.ViewportSize
+    local screenCenter = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
+    
+    -- Create a ray from screen center instead of using Mouse.Hit
+    local ray = camera:ViewportPointToRay(screenCenter.X, screenCenter.Y)
+    local origin = ray.Origin
+    local direction = ray.Direction * 1000
 
     local rayParams = RaycastParams.new()
     rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
