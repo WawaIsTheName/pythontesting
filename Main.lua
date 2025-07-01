@@ -714,7 +714,7 @@ local function isEnemyUnderCrosshair()
     local viewportSize = camera.ViewportSize
     local screenCenter = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
     
-    -- Create a ray from screen center instead of using Mouse.Hit
+    -- First try using the screen center raycast
     local ray = camera:ViewportPointToRay(screenCenter.X, screenCenter.Y)
     local origin = ray.Origin
     local direction = ray.Direction * 1000
@@ -751,6 +751,36 @@ local function isEnemyUnderCrosshair()
         local player = Players:GetPlayerFromCharacter(character)
         if isEnemy(player, character) then
             return true
+        end
+    end
+
+    -- Fallback to Mouse.Hit if screen center raycast didn't find anything
+    if Mouse and Mouse.Hit and typeof(Mouse.Hit.Position) == "Vector3" then
+        local direction = (Mouse.Hit.Position - origin).Unit * 1000
+        result = workspace:Raycast(origin, direction, rayParams)
+
+        iterations = 0
+        while result and result.Instance and iterations < maxIterations do
+            local inst = result.Instance
+
+            local isTransparent = inst.Transparency > 0.025
+            local isEmptyUnion = inst:IsA("UnionOperation") and inst.CollisionFidelity == Enum.CollisionFidelity.Box and inst:IsDescendantOf(workspace)
+
+            if isTransparent or isEmptyUnion then
+                table.insert(rayParams.FilterDescendantsInstances, inst)
+                iterations += 1
+                result = workspace:Raycast(origin, direction, rayParams)
+            else
+                break
+            end
+        end
+
+        if result and result.Instance then
+            local character = result.Instance:FindFirstAncestorOfClass("Model")
+            local player = Players:GetPlayerFromCharacter(character)
+            if isEnemy(player, character) then
+                return true
+            end
         end
     end
 
