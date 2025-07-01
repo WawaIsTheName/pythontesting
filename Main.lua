@@ -53,7 +53,7 @@ local settings = {
     toggleKey = Enum.KeyCode.Home,
     triggerToggleKey = Enum.KeyCode.T,
     shootDelay = 0,
-    firstShotDelay = 0.02,
+    firstShotDelay = 0,
     lastShotTime = 0,
     targetDetectedTime = 0,
     hasTarget = false,
@@ -198,7 +198,7 @@ firstDelayTitle.Name = "FirstDelayTitle"
 firstDelayTitle.Size = UDim2.new(1, 0, 0.5, 0)
 firstDelayTitle.Position = UDim2.new(0, 0, 0, 0)
 firstDelayTitle.BackgroundTransparency = 1
-firstDelayTitle.Text = "First Shot Delay: 0.02s"
+firstDelayTitle.Text = "First Shot Delay: 0s"
 firstDelayTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
 firstDelayTitle.Font = Enum.Font.Gotham
 firstDelayTitle.TextSize = 12
@@ -215,7 +215,7 @@ firstDelayBar.Parent = firstDelaySlider
 
 local firstDelayFill = Instance.new("Frame")
 firstDelayFill.Name = "FirstDelayFill"
-firstDelayFill.Size = UDim2.new(0.02, 0, 1, 0)
+firstDelayFill.Size = UDim2.new(0, 0, 1, 0)
 firstDelayFill.Position = UDim2.new(0, 0, 0, 0)
 firstDelayFill.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
 firstDelayFill.BorderSizePixel = 0
@@ -795,37 +795,15 @@ local function handleShooting()
         return
     end
 
-    local currentTime = tick()
     local enemyDetected = isEnemyUnderCrosshair()
 
     if enemyDetected then
-        -- First shot delay handling
-        if settings.firstShotDelay > 0 and not settings.waitingForFirstShot and not holdingMouse then
-            settings.targetDetectedTime = currentTime
-            settings.waitingForFirstShot = true
-            return
-        end
-
-        if settings.waitingForFirstShot then
-            if (currentTime - settings.targetDetectedTime) >= settings.firstShotDelay then
-                settings.waitingForFirstShot = false
-            else
-                return
-            end
-        end
-
-        -- Regular shooting with delay
-        if (currentTime - settings.lastShotTime) >= settings.shootDelay then
-            if not holdingMouse then
-                mouse1press()
-                holdingMouse = true
-                settings.lastShotTime = currentTime
-            end
+        if not holdingMouse then
+            mouse1press()
+            holdingMouse = true
         end
     else
         -- No target found
-        settings.waitingForFirstShot = false
-        
         if holdingMouse then
             mouse1release()
             holdingMouse = false
