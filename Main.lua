@@ -9,8 +9,14 @@ local Mouse = LocalPlayer:GetMouse()
 
 local function mouse1press()
     if not VirtualInputManager then
-        -- Fallback to old method if VirtualInputManager isn't available
-        mouse1click()
+        -- More reliable fallback
+        local vim = game:GetService("VirtualInputManager")
+        if vim then
+            vim:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, true, game, 1)
+        else
+            -- Ultimate fallback
+            mouse1click()
+        end
     else
         VirtualInputManager:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, true, game, 1)
     end
@@ -820,10 +826,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 RunService.RenderStepped:Connect(function()
-    local currentTime = tick()
-    
     if settings.enabled and settings.triggerOn and not manualShooting then
-        local hasEnemy, enemyPosition, enemyDistance, enemyCharacter = getEnemyUnderCrosshair()
+        local hasEnemy = getEnemyUnderCrosshair() -- We only need the boolean return
         
         if hasEnemy then
             if not holdingMouse then
