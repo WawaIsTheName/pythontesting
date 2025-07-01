@@ -718,47 +718,33 @@ end
 
 local function isEnemyUnderCrosshair()
     local camera = workspace.CurrentCamera
-    local viewportSize = camera.ViewportSize
-    
-    -- Get the center of the screen
-    local screenCenter = Vector2.new(viewportSize.X/2, viewportSize.Y/2)
-    
-    -- Create a ray from the camera through the center of the screen
-    local ray = camera:ViewportPointToRay(screenCenter.X, screenCenter.Y)
-    local origin = ray.Origin
-    local direction = ray.Direction * 2000  -- Increased ray distance
+    local origin = camera.CFrame.Position
+
+    if not Mouse.Hit or typeof(Mouse.Hit.Position) ~= "Vector3" then
+        return false
+    end
+
+    local direction = (Mouse.Hit.Position - origin).Unit * 1000
 
     local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character or {}}
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
     rayParams.IgnoreWater = true
 
-    -- More aggressive part skipping
-    local maxIterations = 100
+    local maxIterations = 20
     local iterations = 0
+
     local result = workspace:Raycast(origin, direction, rayParams)
 
-    -- Skip through transparent parts and unions
+    -- Skip invisible or transparent parts and allow skipping unions with holes
     while result and result.Instance and iterations < maxIterations do
         local inst = result.Instance
-        local shouldSkip = false
-        
-        -- Skip if part is transparent
-        if inst.Transparency > 0.1 then
-            shouldSkip = true
-        end
-        
-        -- Skip if part is a union with box collision
-        if inst:IsA("UnionOperation") and inst.CollisionFidelity == Enum.CollisionFidelity.Box then
-            shouldSkip = true
-        end
-        
-        -- Skip if part is in a no-collision group
-        if inst:IsA("BasePart") and not inst.CanCollide then
-            shouldSkip = true
-        end
 
-        if shouldSkip then
+        local isTransparent = inst.Transparency > 0.05
+
+        local isEmptyUnion = inst:IsA("UnionOperation") and inst.CollisionFidelity == Enum.CollisionFidelity.Box and inst:IsDescendantOf(workspace)
+
+        if isTransparent or isEmptyUnion then
             table.insert(rayParams.FilterDescendantsInstances, inst)
             iterations += 1
             result = workspace:Raycast(origin, direction, rayParams)
@@ -769,11 +755,9 @@ local function isEnemyUnderCrosshair()
 
     if result and result.Instance then
         local character = result.Instance:FindFirstAncestorOfClass("Model")
-        if character then
-            local player = Players:GetPlayerFromCharacter(character)
-            if isEnemy(player, character) then
-                return true
-            end
+        local player = Players:GetPlayerFromCharacter(character)
+        if isEnemy(player, character) then
+            return true
         end
     end
 
@@ -791,8 +775,6 @@ local function predictPosition(targetPosition, targetVelocity, projectileSpeed, 
 end
 
 local function handleShooting()
-    local currentTime = tick()
-    
     -- Manual shooting takes priority
     if isManuallyShooting() then
         manualShooting = true
@@ -813,32 +795,37 @@ local function handleShooting()
         return
     end
 
-    -- Check for targets every frame for maximum responsiveness
-    targetDetected = isEnemyUnderCrosshair()
+    local currentTime = tick()
+    local enemyDetected = isEnemyUnderCrosshair()
 
-    if targetDetected then
+    if enemyDetected then
         -- First shot delay handling
-        if settings.firstShotDelay > 0 and not holdingMouse then
-            if lastTargetTime == 0 then
-                lastTargetTime = currentTime
-            elseif (currentTime - lastTargetTime) >= settings.firstShotDelay then
+        if settings.firstShotDelay > 0 and not settings.waitingForFirstShot and not holdingMouse then
+            settings.targetDetectedTime = currentTime
+            settings.waitingForFirstShot = true
+            return
+        end
+
+        if settings.waitingForFirstShot then
+            if (currentTime - settings.targetDetectedTime) >= settings.firstShotDelay then
+                settings.waitingForFirstShot = false
+            else
+                return
+            end
+        end
+
+        -- Regular shooting with delay
+        if (currentTime - settings.lastShotTime) >= settings.shootDelay then
+            if not holdingMouse then
                 mouse1press()
                 holdingMouse = true
-                lastShotTime = currentTime
-            end
-        else
-            -- Regular shooting with delay
-            if not holdingMouse or (settings.shootDelay > 0 and (currentTime - lastShotTime) >= settings.shootDelay) then
-                if not holdingMouse then
-                    mouse1press()
-                    holdingMouse = true
-                end
-                lastShotTime = currentTime
+                settings.lastShotTime = currentTime
             end
         end
     else
         -- No target found
-        lastTargetTime = 0
+        settings.waitingForFirstShot = false
+        
         if holdingMouse then
             mouse1release()
             holdingMouse = false
