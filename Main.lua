@@ -846,18 +846,19 @@ end)
 -- Keybinds
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    
-    if input.KeyCode == settings.toggleKey then
-        toggleUI()
-    elseif input.KeyCode == settings.triggerToggleKey then
-        settings.triggerOn = not settings.triggerOn
-        updateUI()
-    elseif input.KeyCode == settings.spreadControlToggleKey then
-        settings.spreadControlEnabled = not settings.spreadControlEnabled
-        updateUI()
-    elseif input.KeyCode == settings.projectilePredictionKey then
-        settings.projectilePredictionEnabled = not settings.projectilePredictionEnabled
-        updateUI()
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode == settings.toggleKey then
+            toggleUI()
+        elseif input.KeyCode == settings.triggerToggleKey then
+            settings.triggerOn = not settings.triggerOn
+            updateUI()
+        elseif input.KeyCode == settings.spreadControlToggleKey then
+            settings.spreadControlEnabled = not settings.spreadControlEnabled
+            updateUI()
+        elseif input.KeyCode == settings.projectilePredictionKey then
+            settings.projectilePredictionEnabled = not settings.projectilePredictionEnabled
+            updateUI()
+        end
     end
 end)
 
