@@ -636,6 +636,20 @@ local function handleShooting(currentTime, hasEnemy, enemyPosition, enemyDistanc
     end
 end
 
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == settings.toggleKey then
+        toggleUI()
+    elseif input.KeyCode == settings.triggerToggleKey then
+        settings.triggerOn = not settings.triggerOn
+        updateUI()
+    elseif input.KeyCode == settings.spreadControlToggleKey then
+        settings.spreadControlEnabled = not settings.spreadControlEnabled
+        updateUI()
+    end
+end)
+
 RunService.RenderStepped:Connect(function()
     local currentTime = tick()
     
