@@ -5,8 +5,33 @@ local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
+local LocalPlayer, Mouse
+
+local function getMouse()
+    if not LocalPlayer then return nil end
+    local success, mouse = pcall(function() return LocalPlayer:GetMouse() end)
+    return success and mouse or nil
+end
+
+local function initialize()
+    LocalPlayer = Players.LocalPlayer
+    while not LocalPlayer do
+        LocalPlayer = Players.LocalPlayer
+        wait(0.1)
+    end
+    
+    Mouse = LocalPlayer:GetMouse()
+    while not Mouse or not Mouse.Hit do
+        if LocalPlayer then
+            Mouse = LocalPlayer:GetMouse()
+        end
+        wait(0.1)
+    end
+    
+    -- Initialize other dependencies
+    AutoReload = findAutoReload()
+    updateUI()
+end
 
 -- Try to find AutoReload variable in the game
 local AutoReload = nil
@@ -24,24 +49,27 @@ local function findAutoReload()
     
     return AutoReload
 end
-AutoReload = findAutoReload()
 
 local function mouse1press()
+    local mouse = getMouse()
+    if not mouse then return end
+    
     local vim = game:GetService("VirtualInputManager")
     if vim then
-        vim:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, true, game, 1)
+        vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, true, game, 1)
     else
-        -- Fallback if VirtualInputManager isn't available
         mouse1click()
     end
 end
 
 local function mouse1release()
+    local mouse = getMouse()
+    if not mouse then return end
+    
     local vim = game:GetService("VirtualInputManager")
     if vim then
-        vim:SendMouseButtonEvent(Mouse.X, Mouse.Y, 0, false, game, 1)
+        vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, false, game, 1)
     else
-        -- Fallback if VirtualInputManager isn't available
         keyrelease(0x01)
     end
 end
@@ -717,13 +745,13 @@ local function isEnemy(player, character)
 end
 
 local function isEnemyUnderCrosshair()
+    if not LocalPlayer or not LocalPlayer.Character then return false end
+    if not Mouse or not Mouse.Hit or typeof(Mouse.Hit.Position) ~= "Vector3" then return false end
+    
     local camera = workspace.CurrentCamera
+    if not camera then return false end
+    
     local origin = camera.CFrame.Position
-
-    if not Mouse.Hit or typeof(Mouse.Hit.Position) ~= "Vector3" then
-        return false
-    end
-
     local direction = (Mouse.Hit.Position - origin).Unit * 1000
 
     local rayParams = RaycastParams.new()
@@ -813,15 +841,21 @@ end
 
 -- Main loop
 RunService.RenderStepped:Connect(function()
-    -- Auto-reload handling
-    if settings.autoReloadEnabled and AutoReload and not isManuallyShooting() then
-        AutoReload.Value = true
-        if AutoReloadThreshold then
-            AutoReloadThreshold.Value = 100
+    local success, err = pcall(function()
+        -- Auto-reload handling
+        if settings.autoReloadEnabled and AutoReload and not isManuallyShooting() then
+            AutoReload.Value = true
+            if AutoReloadThreshold then
+                AutoReloadThreshold.Value = 100
+            end
         end
-    end
+        
+        handleShooting()
+    end)
     
-    handleShooting()
+    if not success then
+        warn("Error in main loop:", err)
+    end
 end)
 
 -- Keybinds
