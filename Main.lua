@@ -73,7 +73,6 @@ local settings = {
     lastTargetCheck = 0,
     autoReloadEnabled = false,
     waitingForFirstShot = false,
-    manualShooting = false,
     lastManualShotTime = 0
 }
 
@@ -698,6 +697,7 @@ local lastTargetDistance = nil
 local lastTargetTime = 0
 local spreadControlHolding = false
 local holdingMouse = false
+local manualShooting = false
 
 local function isManuallyShooting()
     return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or
@@ -775,7 +775,7 @@ local function predictPosition(targetPosition, targetVelocity, projectileSpeed, 
 end
 
 local function handleShooting()
-    -- Manual shooting takes priority
+    --  shooting takes priority
     if isManuallyShooting() then
         manualShooting = true
         if holdingMouse then
