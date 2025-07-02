@@ -6,6 +6,13 @@ local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer, Mouse
+local debugMode = true
+
+local function debugPrint(message)
+    if debugMode then
+        print("[DEBUG] " .. message)
+    end
+end
 
 local function getMouse()
     if not LocalPlayer then return nil end
@@ -14,23 +21,23 @@ local function getMouse()
 end
 
 local function initialize()
+    -- Wait for player
+    while not Players.LocalPlayer do
+        wait(0.1)
+    end
     LocalPlayer = Players.LocalPlayer
-    while not LocalPlayer do
-        LocalPlayer = Players.LocalPlayer
+    debugPrint("LocalPlayer initialized")
+
+    -- Wait for mouse
+    while not LocalPlayer:GetMouse() do
         wait(0.1)
     end
-    
     Mouse = LocalPlayer:GetMouse()
-    while not Mouse or not Mouse.Hit do
-        if LocalPlayer then
-            Mouse = LocalPlayer:GetMouse()
-        end
-        wait(0.1)
-    end
-    
-    -- Initialize other dependencies
-    AutoReload = findAutoReload()
+    debugPrint("Mouse initialized")
+
+    -- Initialize other components
     updateUI()
+    debugPrint("Initialization complete")
 end
 
 -- Try to find AutoReload variable in the game
@@ -51,26 +58,34 @@ local function findAutoReload()
 end
 
 local function mouse1press()
-    local mouse = getMouse()
+    debugPrint("Attempting mouse press")
+    local mouse = Mouse
     if not mouse then return end
     
     local vim = game:GetService("VirtualInputManager")
     if vim then
         vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, true, game, 1)
+        debugPrint("Virtual mouse press sent")
     else
+        -- Fallback method
         mouse1click()
+        debugPrint("Fallback mouse press")
     end
 end
 
 local function mouse1release()
-    local mouse = getMouse()
+    debugPrint("Attempting mouse release")
+    local mouse = Mouse
     if not mouse then return end
     
     local vim = game:GetService("VirtualInputManager")
     if vim then
         vim:SendMouseButtonEvent(mouse.X, mouse.Y, 0, false, game, 1)
+        debugPrint("Virtual mouse release sent")
     else
+        -- Fallback method
         keyrelease(0x01)
+        debugPrint("Fallback mouse release")
     end
 end
 
@@ -745,11 +760,21 @@ local function isEnemy(player, character)
 end
 
 local function isEnemyUnderCrosshair()
-    if not LocalPlayer or not LocalPlayer.Character then return false end
-    if not Mouse or not Mouse.Hit or typeof(Mouse.Hit.Position) ~= "Vector3" then return false end
+    if not LocalPlayer or not LocalPlayer.Character then 
+        debugPrint("No local player or character")
+        return false 
+    end
+    
+    if not Mouse or not Mouse.Hit then 
+        debugPrint("No mouse or mouse hit")
+        return false 
+    end
     
     local camera = workspace.CurrentCamera
-    if not camera then return false end
+    if not camera then 
+        debugPrint("No camera")
+        return false 
+    end
     
     local origin = camera.CFrame.Position
     local direction = (Mouse.Hit.Position - origin).Unit * 1000
@@ -759,38 +784,23 @@ local function isEnemyUnderCrosshair()
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
     rayParams.IgnoreWater = true
 
-    local maxIterations = 20
-    local iterations = 0
-
     local result = workspace:Raycast(origin, direction, rayParams)
-
-    -- Skip invisible or transparent parts and allow skipping unions with holes
-    while result and result.Instance and iterations < maxIterations do
-        local inst = result.Instance
-
-        local isTransparent = inst.Transparency > 0.05
-
-        local isEmptyUnion = inst:IsA("UnionOperation") and inst.CollisionFidelity == Enum.CollisionFidelity.Box and inst:IsDescendantOf(workspace)
-
-        if isTransparent or isEmptyUnion then
-            table.insert(rayParams.FilterDescendantsInstances, inst)
-            iterations += 1
-            result = workspace:Raycast(origin, direction, rayParams)
-        else
-            break
-        end
-    end
-
+    
     if result and result.Instance then
         local character = result.Instance:FindFirstAncestorOfClass("Model")
-        local player = Players:GetPlayerFromCharacter(character)
-        if isEnemy(player, character) then
-            return true
+        if character then
+            local player = Players:GetPlayerFromCharacter(character)
+            if isEnemy(player, character) then
+                debugPrint("Enemy detected under crosshair")
+                return true
+            end
         end
     end
-
+    
+    debugPrint("No enemy detected")
     return false
 end
+
 
 local function getTargetVelocity(character)
     local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
@@ -809,6 +819,7 @@ local function handleShooting()
         if holdingMouse then
             mouse1release()
             holdingMouse = false
+            debugPrint("Manual shooting - releasing mouse")
         end
         return
     else
@@ -819,6 +830,7 @@ local function handleShooting()
         if holdingMouse then
             mouse1release()
             holdingMouse = false
+            debugPrint("Triggerbot disabled - releasing mouse")
         end
         return
     end
@@ -829,18 +841,24 @@ local function handleShooting()
         if not holdingMouse then
             mouse1press()
             holdingMouse = true
+            debugPrint("Enemy detected - pressing mouse")
         end
     else
-        -- No target found
         if holdingMouse then
             mouse1release()
             holdingMouse = false
+            debugPrint("No enemy - releasing mouse")
         end
     end
 end
 
 -- Main loop
+local lastTick = tick()
 RunService.RenderStepped:Connect(function()
+    local now = tick()
+    if now - lastTick < 0.001 then return end -- ~50fps
+    lastTick = now
+    
     local success, err = pcall(function()
         -- Auto-reload handling
         if settings.autoReloadEnabled and AutoReload and not isManuallyShooting() then
@@ -850,7 +868,7 @@ RunService.RenderStepped:Connect(function()
             end
         end
         
-        handleShooting()
+        handleShooting() -- Removed nested pcall
     end)
     
     if not success then
@@ -875,6 +893,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             updateUI()
         end
     end
+end)
+
+spawn(function()
+    initialize()
+    debugPrint("Triggerbot ready")
+    
+    -- Add a test message to verify it's working
+    warn("MangoBot loaded successfully! Press Home to toggle UI")
 end)
 
 -- Initialize
